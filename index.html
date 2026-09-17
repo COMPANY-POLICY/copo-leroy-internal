@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leroy — Particulate Cursor</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #fff; }
+    #leroy { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+
+    .panel {
+      position: fixed; top: 16px; right: 16px; width: 208px;
+      padding: 14px; border: 1px solid #e3e3e3; border-radius: 10px;
+      background: rgba(255,255,255,0.94); backdrop-filter: blur(6px);
+      font: 12px/1.4 system-ui, sans-serif; color: #222;
+      user-select: none;
+    }
+    .panel h1 { margin: 0 0 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #888; font-weight: 500; }
+    .row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .row button {
+      flex: 1; padding: 6px 4px; border: 1px solid #ddd; border-radius: 7px;
+      background: #fff; cursor: pointer; font: inherit; color: #222;
+    }
+    .row button:hover { border-color: #999; }
+    .row button[data-on="true"] { background: #141414; border-color: #141414; color: #fff; }
+    label { display: block; margin-bottom: 9px; }
+    label span { display: flex; justify-content: space-between; color: #777; margin-bottom: 3px; }
+    label span b { color: #222; font-weight: 500; font-variant-numeric: tabular-nums; }
+    input[type=range] { width: 100%; accent-color: #141414; }
+    .stats { margin-top: 10px; padding-top: 9px; border-top: 1px solid #eee; color: #999; font-variant-numeric: tabular-nums; }
+    .hint { position: fixed; left: 16px; bottom: 14px; font: 12px system-ui, sans-serif; color: #b3b3b3; }
+  </style>
+</head>
+<body>
+  <canvas id="leroy"></canvas>
+
+  <div class="panel">
+    <h1>Leroy</h1>
+    <div class="row">
+      <button id="auto" data-on="true">Auto</button>
+      <button id="ink">Ink</button>
+      <button id="clear">Clear</button>
+    </div>
+    <label>
+      <span>Precipitation <b id="v-emit"></b></span>
+      <input id="emit" type="range" min="1" max="14" step="1" />
+    </label>
+    <label>
+      <span>Condensation <b id="v-pull"></b></span>
+      <input id="pull" type="range" min="0" max="1.2" step="0.02" />
+    </label>
+    <label>
+      <span>Globule size <b id="v-core"></b></span>
+      <input id="core" type="range" min="10" max="48" step="1" />
+    </label>
+    <label>
+      <span>Capacity <b id="v-cap"></b></span>
+      <input id="cap" type="range" min="80" max="900" step="10" />
+    </label>
+    <label>
+      <span>Diffusion <b id="v-wander"></b></span>
+      <input id="wander" type="range" min="0" max="0.6" step="0.01" />
+    </label>
+    <label>
+      <span>Crossing radius <b id="v-cross"></b></span>
+      <input id="cross" type="range" min="4" max="40" step="1" />
+    </label>
+    <div class="stats"><span id="stats">—</span></div>
+  </div>
+  <div class="hint">Move the cursor. Linger, or cross your own path, and it condenses.</div>
+
+  <script type="module">
+    import { mountLeroyCursor, CONFIG } from "./leroy-cursor.js";
+
+    const canvas = document.getElementById("leroy");
+    const leroy = mountLeroyCursor(canvas, { auto: true });
+
+    const $ = (id) => document.getElementById(id);
+
+    // sliders write straight into CONFIG; the engine reads it every frame
+    const bind = (id, get, set, fmt = (v) => v) => {
+      const el = $(id), out = $("v-" + id);
+      el.value = get();
+      out.textContent = fmt(get());
+      el.addEventListener("input", () => {
+        set(parseFloat(el.value));
+        out.textContent = fmt(parseFloat(el.value));
+      });
+    };
+    bind("emit", () => CONFIG.emit.perPoint, (v) => (CONFIG.emit.perPoint = v));
+    bind("pull", () => CONFIG.condense.pull, (v) => (CONFIG.condense.pull = v), (v) => v.toFixed(2));
+    bind("core", () => CONFIG.condense.maxCoreR, (v) => (CONFIG.condense.maxCoreR = v));
+    bind("cap", () => CONFIG.condense.capacity, (v) => (CONFIG.condense.capacity = v));
+    bind("wander", () => CONFIG.particle.wander, (v) => (CONFIG.particle.wander = v), (v) => v.toFixed(2));
+    bind("cross", () => CONFIG.nucleate.crossDist, (v) => (CONFIG.nucleate.crossDist = v));
+
+    let auto = true;
+    $("auto").addEventListener("click", (e) => {
+      auto = !auto;
+      leroy.setAuto(auto);
+      e.currentTarget.dataset.on = String(auto);
+    });
+    $("clear").addEventListener("click", () => leroy.clear());
+
+    const INKS = ["#141414", "#C0B563", "#2B4B7E"];
+    let inkI = 0;
+    $("ink").addEventListener("click", () => {
+      inkI = (inkI + 1) % INKS.length;
+      CONFIG.palette.ink = INKS[inkI];
+    });
+
+    setInterval(() => {
+      const s = leroy.stats();
+      $("stats").textContent = `${s.particles} dust · ${s.nuclei} nuclei · ${s.chain} chain`;
+    }, 300);
+  </script>
+</body>
+</html>

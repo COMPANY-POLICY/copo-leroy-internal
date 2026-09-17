@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Leroy — frame shot</title>
+  <style>
+    html, body { margin: 0; background: #fff; font: 12px system-ui, sans-serif; }
+    #leroy { display: block; width: 1000px; height: 700px; }
+    #meta { position: fixed; left: 8px; bottom: 6px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <!-- Steps the engine frame by frame with requestAnimationFrame stubbed out, so
+       a still can be rendered (and tuned) without waiting on real time — useful
+       when the page is throttled or offscreen and rAF barely fires.
+
+         dev/frame-shot.html?frames=1100&mode=mouse&speed=0.015
+
+       mode=auto (default) uses the engine's own demo path; mode=mouse drives it
+       with synthetic mousemove events, pausing twice to exercise dwell beading.
+       Pumps on load; re-pump at any time from the console with __pump(n). -->
+  <canvas id="leroy"></canvas>
+  <div id="meta"></div>
+  <script type="module">
+    const q = new URLSearchParams(location.search);
+    const frames = parseInt(q.get("frames") || "900", 10);
+    const mode = q.get("mode") || "auto";
+
+    // Stub rAF for the whole session: the engine's tick re-arms itself every
+    // frame, so holding the pending callback lets us advance it on demand.
+    let pending = null;
+    window.requestAnimationFrame = (cb) => { pending = cb; return 1; };
+
+    const { mountLeroyCursor, CONFIG } = await import("../leroy-cursor.js");
+    if (q.get("speed")) CONFIG.auto.speed = parseFloat(q.get("speed"));
+
+    const canvas = document.getElementById("leroy");
+    const leroy = mountLeroyCursor(canvas, { auto: mode === "auto" });
+
+    let frame = 0;
+    window.__pump = (n) => {
+      const rect = canvas.getBoundingClientRect();
+      const t0 = performance.now();
+      for (let i = 0; i < n; i++, frame++) {
+        if (mode === "mouse") {
+          // hand-drawn stand-in: a self-crossing knot that pauses twice
+          const dwelling = (frame > 300 && frame < 400) || (frame > 700 && frame < 800);
+          if (!dwelling) window.__mt = (window.__mt || 0) + 0.014;
+          const mt = window.__mt || 0;
+          const x = 500 + Math.cos(mt) * 250 + Math.cos(mt * 2.3 + 0.7) * 90;
+          const y = 350 + Math.sin(mt * 1.6) * 210;
+          canvas.dispatchEvent(new MouseEvent("mousemove", {
+            clientX: rect.left + x, clientY: rect.top + y, bubbles: true,
+          }));
+        }
+        const cb = pending;
+        pending = null;
+        if (!cb) break;
+        cb(t0 + i * 16.7);
+      }
+      const s = leroy.stats();
+      const meta =
+        `frame ${frame} · ${s.particles} dust · ${s.nuclei} nuclei · ${s.chain} chain · ${Math.round(performance.now() - t0)}ms`;
+      document.getElementById("meta").textContent = meta;
+      return meta;
+    };
+
+    window.__leroy = leroy;
+    window.__ready = true;
+    // The engine's ResizeObserver clears the canvas when it fires, and RO rides
+    // the rendering lifecycle — so pump from the console once the page settles,
+    // or just call __pump again to repaint.
+    setTimeout(() => window.__pump(frames), 250);
+  </script>
+</body>
+</html>
