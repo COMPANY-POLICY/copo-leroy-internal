@@ -92,6 +92,9 @@ woven look: the grid decides what survives, the way a weave does.
   levels, and dither, which breaks flat areas into stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
 - **Border** — bands and corner scrolls, applied to a dropped image too.
+- **Transparent ground** — drops the panel colour so the PNG exports as the
+  lace alone, to lay over a photograph or a product shot. The lower tonal
+  levels stay semi-transparent, which is what you want over a busy ground.
 - **Use image** — drop any artwork and it is stitched onto the same grid by
   luminance, which is the quickest route if you already have the lace you want.
 

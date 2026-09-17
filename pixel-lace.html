@@ -12,6 +12,14 @@
     #stageWrap { flex: 1; overflow: hidden; position: relative; }
     #stage { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%;
       box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+    #stage.alpha {
+      background-image:
+        linear-gradient(45deg, #1a1f22 25%, transparent 25%, transparent 75%, #1a1f22 75%),
+        linear-gradient(45deg, #1a1f22 25%, transparent 25%, transparent 75%, #1a1f22 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 12px 12px;
+      background-color: #12171a;
+    }
     #drop { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
       color: var(--dim); opacity: 0; transition: opacity .15s; font-size: 14px; }
     #drop.on { opacity: 1; background: rgba(10,13,14,.75); }
@@ -58,6 +66,7 @@
       <label><span>Ground</span><input type="color" id="bg" value="#06120c" /></label>
       <label><span>Thread</span><input type="color" id="ink" value="#2fe36a" /></label>
     </div>
+    <button id="alphaBtn" style="width:100%">Transparent ground</button>
 
     <h2>Grid</h2>
     <label><span>Columns <b id="v-cols"></b></span>
@@ -123,7 +132,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 
 const S = {
   w: 1400, h: 1000, dpr: 2,
-  bg: "#06120c", ink: "#2fe36a",
+  bg: "#06120c", ink: "#2fe36a", alpha: false,
   cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square",
   threshold: 0.2, contrast: 1,
   seed: 20260917, stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
@@ -168,8 +177,12 @@ function build() {
 
 function draw() {
   ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
-  ctx.fillStyle = S.bg;
-  ctx.fillRect(0, 0, S.w, S.h);
+  ctx.clearRect(0, 0, S.w, S.h);
+  if (!S.alpha) {
+    // transparent ground exports the lace as an overlay; opaque bakes a panel
+    ctx.fillStyle = S.bg;
+    ctx.fillRect(0, 0, S.w, S.h);
+  }
   if (!grid) return;
   drawStitches(ctx, grid, {
     w: S.w, h: S.h, ink: S.ink, levels: S.levels, threshold: S.threshold,
@@ -227,6 +240,12 @@ $("preset").addEventListener("change", (e) => {
   build();
 });
 $("shuffle").addEventListener("click", () => { S.seed = (Math.random() * 1e9) | 0; build(); });
+$("alphaBtn").addEventListener("click", (e) => {
+  S.alpha = e.currentTarget.dataset.on !== "true";
+  e.currentTarget.dataset.on = String(S.alpha);
+  stage.classList.toggle("alpha", S.alpha);
+  draw();
+});
 const toggle = (id, key) => $(id).addEventListener("click", (e) => {
   S[key] = e.currentTarget.dataset.on !== "true";
   e.currentTarget.dataset.on = String(S[key]);
