@@ -51,6 +51,30 @@ through the frame and the dust scatters, then re-condenses on its nodes.
 
 Linger and it condenses. Move fast and you get a thin dusty line.
 
+## circle-type.html
+
+A customiser for type set on a circle and rendered as dust — an address ring
+set in fine dotted caps, or a headline in dots over a photograph.
+
+Glyph outlines are read back out of the canvas rather than parsed: each ring is
+drawn once into a scratch canvas and then sampled on a jittered grid, so any
+font on the machine works with no font library and nothing fetched.
+
+- **Rings** — as many as you like, each with its own text, radius, size and
+  angle. `Angle` is where the middle of the run sits, clockwise from twelve
+  o'clock. `↻` flips a ring to face inward and run the other way — the
+  treatment for the lower arc, so it reads the right way up — and moves it to
+  the opposite side, which is almost always what you wanted.
+- **Decoration** — a dotted target, spiral or wave, sampled from the maths so
+  spacing stays even at any size.
+- **Ink** — spacing, dot size, scatter and spray control how the strokes break
+  up; bleed and grain are the same ink treatment the cursor engine uses.
+  `Solid type` renders the rings as clean type instead, for the fine-print look.
+- **Ground** — a colour, or drop an image anywhere on the window to set it as
+  the background, with a dim slider to hold the type off a busy photo.
+- **Assemble** replays the dots flying in and settling. `Save PNG` exports at
+  the canvas's full pixel size.
+
 ## The ornament
 
 `ornament.js` builds the frame as strokes for the engine to trace. Each ribbon

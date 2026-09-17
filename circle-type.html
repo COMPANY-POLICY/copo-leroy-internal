@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leroy — circle type</title>
+  <style>
+    :root { --pane: #0e1113; --line: #23292c; --txt: #c9d3d6; --dim: #79878c; }
+    html, body { margin: 0; height: 100%; background: #0a0d0e; color: var(--txt);
+      font: 12px/1.45 system-ui, sans-serif; overflow: hidden; }
+    #wrap { display: flex; height: 100%; }
+    #stageWrap { flex: 1; overflow: hidden; position: relative; }
+    /* absolute + translate, not grid centering: a canvas much larger than the
+       pane overflows a grid cell and stops being centred */
+    #stage { position: absolute; left: 50%; top: 50%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.55); transform-origin: 50% 50%; }
+    #drop { position: absolute; inset: 0; pointer-events: none; display: grid; place-items: center;
+      color: var(--dim); opacity: 0; transition: opacity .15s; font-size: 14px; }
+    #drop.on { opacity: 1; background: rgba(10,13,14,.75); }
+
+    aside { width: 292px; border-left: 1px solid var(--line); background: var(--pane);
+      overflow-y: auto; padding: 14px; }
+    h2 { margin: 18px 0 8px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); font-weight: 500; }
+    h2:first-child { margin-top: 0; }
+    label { display: block; margin-bottom: 8px; }
+    label > span { display: flex; justify-content: space-between; color: var(--dim); margin-bottom: 2px; }
+    label > span b { color: var(--txt); font-weight: 500; font-variant-numeric: tabular-nums; }
+    input[type=range] { width: 100%; accent-color: #d8ff12; }
+    input[type=text], input[type=number], select {
+      width: 100%; box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--line);
+      border-radius: 6px; background: #0a0d0e; color: var(--txt); font: inherit;
+    }
+    input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid var(--line);
+      border-radius: 6px; background: #0a0d0e; }
+    .row { display: flex; gap: 6px; }
+    .row > * { flex: 1; }
+    button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+      background: transparent; color: var(--txt); cursor: pointer; font: inherit; }
+    button:hover { border-color: #d8ff12; color: #d8ff12; }
+    button[data-on="true"] { background: #d8ff12; border-color: #d8ff12; color: #0a0d0e; }
+    .ring { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+    .ring .head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .ring .head input { flex: 1; }
+    .ring .head button { flex: 0 0 auto; padding: 4px 7px; color: var(--dim); }
+    .mini { display: flex; gap: 6px; }
+    .mini label { flex: 1; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="drop">drop an image to use as the background</div>
+  </div>
+
+  <aside>
+    <h2>Canvas</h2>
+    <label>
+      <select id="preset">
+        <option value="1080x1350">1080 × 1350 — portrait post</option>
+        <option value="1080x1080">1080 × 1080 — square</option>
+        <option value="1350x1800">1350 × 1800 — 18 × 24</option>
+        <option value="1920x1080">1920 × 1080 — landscape</option>
+      </select>
+    </label>
+    <div class="row">
+      <label><span>Ground</span><input type="color" id="bg" value="#101418" /></label>
+      <label><span>Ink</span><input type="color" id="ink" value="#ffffff" /></label>
+    </div>
+    <div class="row">
+      <button id="pickImg">Image…</button>
+      <button id="clearImg">Clear</button>
+    </div>
+    <label style="margin-top:8px"><span>Dim image <b id="v-dim"></b></span>
+      <input id="dim" type="range" min="0" max="0.8" step="0.02" value="0" /></label>
+    <input type="file" id="file" accept="image/*" hidden />
+
+    <h2>Type</h2>
+    <label><span>Font</span>
+      <input type="text" id="font" value="Helvetica Neue, Arial, sans-serif" /></label>
+    <div class="mini">
+      <label><span>Weight <b id="v-weight"></b></span>
+        <input id="weight" type="range" min="300" max="900" step="100" value="700" /></label>
+      <label><span>Tracking <b id="v-track"></b></span>
+        <input id="track" type="range" min="-4" max="30" step="1" value="6" /></label>
+    </div>
+    <div id="rings"></div>
+    <button id="addRing" style="width:100%">+ ring</button>
+
+    <h2>Decoration</h2>
+    <div class="row">
+      <button id="dTarget" data-on="true">Target</button>
+      <button id="dSpiral">Spiral</button>
+      <button id="dWave">Wave</button>
+    </div>
+    <label style="margin-top:8px"><span>Size <b id="v-decor"></b></span>
+      <input id="decor" type="range" min="20" max="400" step="5" value="120" /></label>
+    <div class="mini">
+      <label><span>Offset x <b id="v-dx"></b></span>
+        <input id="dx" type="range" min="-500" max="500" step="5" value="0" /></label>
+      <label><span>Offset y <b id="v-dy"></b></span>
+        <input id="dy" type="range" min="-500" max="500" step="5" value="0" /></label>
+    </div>
+
+    <h2>Ink</h2>
+    <label><span>Spacing <b id="v-spacing"></b></span>
+      <input id="spacing" type="range" min="1.5" max="10" step="0.25" value="3.5" /></label>
+    <label><span>Dot size <b id="v-size"></b></span>
+      <input id="size" type="range" min="0.8" max="8" step="0.1" value="2.4" /></label>
+    <label><span>Scatter <b id="v-jitter"></b></span>
+      <input id="jitter" type="range" min="0" max="1.5" step="0.05" value="0.85" /></label>
+    <label><span>Spray <b id="v-spray"></b></span>
+      <input id="spray" type="range" min="0" max="8" step="0.25" value="1.5" /></label>
+    <label><span>Bleed <b id="v-bleedA"></b></span>
+      <input id="bleedA" type="range" min="0" max="0.4" step="0.01" value="0.12" /></label>
+    <label><span>Grain <b id="v-grain"></b></span>
+      <input id="grain" type="range" min="0" max="0.4" step="0.01" value="0.08" /></label>
+    <div class="row">
+      <button id="stampBtn" data-on="true">Stamp</button>
+      <button id="solidBtn">Solid type</button>
+    </div>
+
+    <h2>Output</h2>
+    <div class="row">
+      <button id="assemble">Assemble</button>
+      <button id="save">Save PNG</button>
+    </div>
+    <div style="color:var(--dim); margin-top:8px" id="count">—</div>
+  </aside>
+</div>
+
+<script type="module">
+import { circularText, shape, makeDots, drawDots, drawGrain } from "./particle-text.js";
+
+const $ = (id) => document.getElementById(id);
+const stage = $("stage");
+const ctx = stage.getContext("2d");
+
+const state = {
+  w: 1080, h: 1350, dpr: 2,
+  bg: "#101418", ink: "#ffffff", image: null, dim: 0,
+  font: "Helvetica Neue, Arial, sans-serif", weight: 700, tracking: 6,
+  rings: [
+    { text: "CHASE THE SKY", radius: 300, size: 74, flip: false, angle: 0 },
+    { text: "USAL — FIELD NOTES", radius: 214, size: 34, flip: true, angle: 180 },
+  ],
+  decor: { target: true, spiral: false, wave: false, r: 120, dx: 0, dy: 0 },
+  spacing: 3.5, size: 2.4, jitter: 0.85, spray: 1.5,
+  bleedA: 0.12, grain: 0.08, stamp: true, solid: false,
+  anim: 0, animating: false,
+};
+
+let dots = [], solids = [];
+
+// --- build ----------------------------------------------------------------
+function build() {
+  const cx = state.w / 2, cy = state.h / 2;
+  const pts = [];
+  solids = [];
+  state.rings.forEach((r, i) => {
+    if (!r.text.trim()) return;
+    const out = circularText({
+      text: r.text, cx, cy, radius: r.radius, fontSize: r.size,
+      fontFamily: state.font, weight: state.weight, tracking: state.tracking,
+      startAngle: r.angle, flip: r.flip, solid: state.solid,
+      spacing: state.spacing, jitter: state.jitter, spray: state.spray,
+      strayChance: 0.08, seed: 0x1000 + i * 977,
+    });
+    if (out.solid) solids.push(out.solid);
+    else pts.push(...out.points);
+  });
+
+  const d = state.decor, dcx = cx + d.dx, dcy = cy + d.dy;
+  const opts = { cx: dcx, cy: dcy, r: d.r, spacing: Math.max(3, state.spacing * 2), jitter: 0.6 };
+  if (d.target) pts.push(...shape("target", { ...opts, seed: 0x31 }));
+  if (d.spiral) pts.push(...shape("spiral", { ...opts, seed: 0x32, turns: 3.5 }));
+  if (d.wave) pts.push(...shape("wave", { ...opts, seed: 0x33, turns: 2.5 }));
+
+  dots = makeDots(pts, { size: state.size, blotChance: state.stamp ? 0.22 : 0, seed: 0x5a });
+  $("count").textContent = `${dots.length.toLocaleString()} dots`;
+  if (state.animating) seedAssemble();
+  draw();
+}
+
+// --- assemble animation ---------------------------------------------------
+function seedAssemble() {
+  const cx = state.w / 2, cy = state.h / 2;
+  for (const d of dots) {
+    const a = Math.atan2(d.y - cy, d.x - cx) + (Math.random() - 0.5) * 1.2;
+    const push = 120 + Math.random() * 420;
+    d.fx = d.x + Math.cos(a) * push;
+    d.fy = d.y + Math.sin(a) * push;
+    d.tx = d.x; d.ty = d.y;
+    d.delay = Math.random() * 0.45;
+    d.on = 0;
+  }
+  state.anim = 0;
+  state.last = performance.now();
+  state.animating = true;
+}
+
+function stepAssemble() {
+  // wall-clock, not per-frame: a throttled or backgrounded tab still lands the
+  // animation rather than crawling through it
+  const now = performance.now();
+  state.anim += Math.min(0.1, (now - (state.last ?? now)) / 1000);
+  state.last = now;
+  let done = true;
+  for (const d of dots) {
+    const t = Math.max(0, Math.min(1, (state.anim - d.delay) / 0.55));
+    if (t < 1) done = false;
+    const e = 1 - Math.pow(1 - t, 3);
+    d.x = d.fx + (d.tx - d.fx) * e;
+    d.y = d.fy + (d.ty - d.fy) * e;
+    d.on = t;
+  }
+  if (done) {
+    state.animating = false;
+    for (const d of dots) { d.x = d.tx; d.y = d.ty; d.on = 1; }
+  }
+}
+
+// --- draw -----------------------------------------------------------------
+function draw() {
+  const { w, h, dpr } = state;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = state.bg;
+  ctx.fillRect(0, 0, w, h);
+  if (state.image) {
+    const img = state.image;
+    const s = Math.max(w / img.width, h / img.height);
+    const iw = img.width * s, ih = img.height * s;
+    ctx.drawImage(img, (w - iw) / 2, (h - ih) / 2, iw, ih);
+    if (state.dim > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${state.dim})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+  for (const s of solids) {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    const t = document.createElement("canvas");
+    t.width = s.img.width; t.height = s.img.height;
+    const g = t.getContext("2d");
+    g.drawImage(s.img, 0, 0);
+    g.globalCompositeOperation = "source-in";
+    g.fillStyle = state.ink;
+    g.fillRect(0, 0, t.width, t.height);
+    ctx.drawImage(t, s.x, s.y, s.w, s.h);
+    ctx.restore();
+  }
+  drawDots(ctx, dots, {
+    ink: state.ink, stamp: state.stamp, bleedAlpha: state.bleedA,
+  });
+  drawGrain(ctx, w, h, state.grain);
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  if (!state.animating) return;
+  stepAssemble();
+  draw();
+}
+requestAnimationFrame(tick);
+
+// --- canvas sizing --------------------------------------------------------
+function resize() {
+  stage.width = state.w * state.dpr;
+  stage.height = state.h * state.dpr;
+  stage.style.width = state.w + "px";
+  stage.style.height = state.h + "px";
+  fit();
+}
+function fit() {
+  const pad = 32;
+  const box = $("stageWrap").getBoundingClientRect();
+  const s = Math.min((box.width - pad) / state.w, (box.height - pad) / state.h);
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener("resize", fit);
+new ResizeObserver(fit).observe($("stageWrap"));
+
+// --- ring editor ----------------------------------------------------------
+function renderRings() {
+  const host = $("rings");
+  host.innerHTML = "";
+  state.rings.forEach((r, i) => {
+    const el = document.createElement("div");
+    el.className = "ring";
+    el.innerHTML = `
+      <div class="head">
+        <input type="text" value="${r.text.replace(/"/g, "&quot;")}" data-k="text" />
+        <button data-act="flip" data-on="${r.flip}">↻</button>
+        <button data-act="del">×</button>
+      </div>
+      <div class="mini">
+        <label><span>Radius <b>${r.radius}</b></span>
+          <input type="range" min="40" max="900" step="2" value="${r.radius}" data-k="radius" /></label>
+        <label><span>Size <b>${r.size}</b></span>
+          <input type="range" min="8" max="200" step="1" value="${r.size}" data-k="size" /></label>
+      </div>
+      <label><span>Angle <b>${r.angle}°</b></span>
+        <input type="range" min="-180" max="180" step="1" value="${r.angle}" data-k="angle" /></label>`;
+    el.addEventListener("input", (e) => {
+      const k = e.target.dataset.k;
+      if (!k) return;
+      r[k] = k === "text" ? e.target.value : +e.target.value;
+      const b = e.target.previousElementSibling?.querySelector("b");
+      if (b) b.textContent = k === "angle" ? r[k] + "°" : r[k];
+      build();
+    });
+    el.addEventListener("click", (e) => {
+      const act = e.target.dataset.act;
+      if (act === "del") { state.rings.splice(i, 1); renderRings(); build(); }
+      if (act === "flip") {
+        r.flip = !r.flip;
+        r.angle = ((r.angle + 360) % 360) - 180; // jump to the opposite arc
+        e.target.dataset.on = r.flip;
+        renderRings();
+        build();
+      }
+    });
+    host.appendChild(el);
+  });
+}
+$("addRing").addEventListener("click", () => {
+  const last = state.rings[state.rings.length - 1];
+  state.rings.push({
+    text: "NEW RING", radius: last ? Math.max(60, last.radius - 90) : 260,
+    size: last ? Math.max(12, Math.round(last.size * 0.7)) : 40, flip: false, angle: 0,
+  });
+  renderRings();
+  build();
+});
+
+// --- bindings -------------------------------------------------------------
+const slider = (id, key, fmt = (v) => v, after) => {
+  const el = $(id), out = $("v-" + id);
+  const apply = () => {
+    const v = +el.value;
+    if (key) state[key] = v;
+    if (out) out.textContent = fmt(v);
+    after?.(v);
+    build();
+  };
+  el.addEventListener("input", apply);
+  if (out) out.textContent = fmt(+el.value);
+};
+slider("weight", "weight");
+slider("track", "tracking");
+slider("spacing", "spacing", (v) => v.toFixed(2));
+slider("size", "size", (v) => v.toFixed(1));
+slider("jitter", "jitter", (v) => v.toFixed(2));
+slider("spray", "spray", (v) => v.toFixed(2));
+slider("bleedA", "bleedA", (v) => v.toFixed(2));
+slider("grain", "grain", (v) => v.toFixed(2));
+slider("dim", "dim", (v) => v.toFixed(2));
+slider("decor", null, (v) => v, (v) => (state.decor.r = v));
+slider("dx", null, (v) => v, (v) => (state.decor.dx = v));
+slider("dy", null, (v) => v, (v) => (state.decor.dy = v));
+
+$("font").addEventListener("input", (e) => { state.font = e.target.value; build(); });
+$("bg").addEventListener("input", (e) => { state.bg = e.target.value; draw(); });
+$("ink").addEventListener("input", (e) => { state.ink = e.target.value; draw(); });
+$("preset").addEventListener("change", (e) => {
+  const [w, h] = e.target.value.split("x").map(Number);
+  state.w = w; state.h = h;
+  resize();
+  build();
+});
+
+const toggle = (id, fn) => $(id).addEventListener("click", (e) => {
+  const on = e.currentTarget.dataset.on !== "true";
+  e.currentTarget.dataset.on = String(on);
+  fn(on);
+  build();
+});
+toggle("dTarget", (v) => (state.decor.target = v));
+toggle("dSpiral", (v) => (state.decor.spiral = v));
+toggle("dWave", (v) => (state.decor.wave = v));
+toggle("stampBtn", (v) => (state.stamp = v));
+toggle("solidBtn", (v) => (state.solid = v));
+
+$("assemble").addEventListener("click", () => { seedAssemble(); });
+$("save").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.download = `circle-type-${stage.width}x${stage.height}.png`;
+  a.href = stage.toDataURL("image/png");
+  a.click();
+});
+
+// --- background image -----------------------------------------------------
+function loadImage(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => { state.image = img; draw(); URL.revokeObjectURL(url); };
+  img.src = url;
+}
+$("pickImg").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => e.target.files[0] && loadImage(e.target.files[0]));
+$("clearImg").addEventListener("click", () => { state.image = null; draw(); });
+const dropEl = $("drop");
+addEventListener("dragover", (e) => { e.preventDefault(); dropEl.classList.add("on"); });
+addEventListener("dragleave", () => dropEl.classList.remove("on"));
+addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropEl.classList.remove("on");
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith("image/")) loadImage(f);
+});
+
+// --- go -------------------------------------------------------------------
+renderRings();
+resize();
+build(); // the composition is there on load; Assemble replays it flying in
+window.__state = state;
+window.__build = build;
+window.__draw = draw;
+</script>
+</body>
+</html>

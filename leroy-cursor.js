@@ -760,4 +760,5 @@ export function mountLeroyCursor(canvas, opts = {}) {
   };
 }
 
-export { CONFIG };
+// the ink itself is reusable — circle-type.html stamps its dots with these
+export { CONFIG, stamps, paperGrain, rng32, valueNoise };
