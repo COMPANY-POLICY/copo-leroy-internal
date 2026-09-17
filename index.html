@@ -41,6 +41,9 @@
       <button id="ink">Ink</button>
       <button id="clear">Clear</button>
     </div>
+    <div class="row">
+      <button id="stampBtn" data-on="true">Stamp: on</button>
+    </div>
     <label>
       <span>Precipitation <b id="v-emit"></b></span>
       <input id="emit" type="range" min="1" max="14" step="1" />
@@ -65,9 +68,17 @@
       <span>Crossing radius <b id="v-cross"></b></span>
       <input id="cross" type="range" min="4" max="40" step="1" />
     </label>
+    <label>
+      <span>Bleed <b id="v-bleed"></b></span>
+      <input id="bleed" type="range" min="0" max="0.4" step="0.01" />
+    </label>
+    <label>
+      <span>Grain <b id="v-grain"></b></span>
+      <input id="grain" type="range" min="0" max="0.5" step="0.01" />
+    </label>
     <div class="stats"><span id="stats">—</span></div>
   </div>
-  <div class="hint">Move the cursor. Linger, or cross your own path, and it condenses.</div>
+  <div class="hint">Move the cursor. Linger, or cross your own path, and it condenses. See also <a href="./border.html" style="color:#777">border.html</a> — an 18 × 24 ornament.</div>
 
   <script type="module">
     import { mountLeroyCursor, CONFIG } from "./leroy-cursor.js";
@@ -93,6 +104,14 @@
     bind("cap", () => CONFIG.condense.capacity, (v) => (CONFIG.condense.capacity = v));
     bind("wander", () => CONFIG.particle.wander, (v) => (CONFIG.particle.wander = v), (v) => v.toFixed(2));
     bind("cross", () => CONFIG.nucleate.crossDist, (v) => (CONFIG.nucleate.crossDist = v));
+    bind("bleed", () => CONFIG.stamp.bleedAlpha, (v) => (CONFIG.stamp.bleedAlpha = v), (v) => v.toFixed(2));
+    bind("grain", () => CONFIG.stamp.grain, (v) => (CONFIG.stamp.grain = v), (v) => v.toFixed(2));
+
+    $("stampBtn").addEventListener("click", (e) => {
+      CONFIG.stamp.enabled = !CONFIG.stamp.enabled;
+      e.currentTarget.dataset.on = String(CONFIG.stamp.enabled);
+      e.currentTarget.textContent = `Stamp: ${CONFIG.stamp.enabled ? "on" : "off"}`;
+    });
 
     let auto = true;
     $("auto").addEventListener("click", (e) => {

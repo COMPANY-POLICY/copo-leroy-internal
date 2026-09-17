@@ -70,6 +70,21 @@ const CONFIG = {
     beadChance: 0.5,
   },
 
+  // Ink behaviour — dots that soak, blot and sit on a grained ground rather
+  // than reading as clean pixels.
+  stamp: {
+    enabled: true,
+    bleed: 2.7,        // soak halo, in dot widths
+    bleedAlpha: 0.13,
+    mottle: 0.5,       // how much the ground's absorbency varies density
+    mottleScale: 0.011,
+    blotChance: 0.26,  // share stamped as ragged polygons instead of squares
+    blotScale: 1.55,
+    pool: 1.25,        // extra weight on dust packed into a globule
+    grain: 0.16,       // paper grain laid over the ink (0 = off)
+    grainScale: 2,
+  },
+
   // Self-drawing demo path (deterministic).
   auto: { enabled: true, speed: 0.015 },
 };
@@ -103,8 +118,10 @@ function ageAlpha(age, hold, out) {
   const t = (age - hold) / out;
   return t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
 }
-const PARTICLE_LIFE = CONFIG.particle.hold + CONFIG.particle.out;
-const SPINE_LIFE = CONFIG.spine.hold + CONFIG.spine.out;
+// Read from CONFIG rather than frozen at load: a page can set hold to Infinity
+// to make a trace persist instead of fading.
+const particleLife = () => CONFIG.particle.hold + CONFIG.particle.out;
+const spineLife = () => CONFIG.spine.hold + CONFIG.spine.out;
 
 // --- spatial grid -----------------------------------------------------------
 function buildGrid(items, cell) {
@@ -134,10 +151,122 @@ function nearestIn(px, py, items, grid, cell, maxD2) {
 // --- rendering --------------------------------------------------------------
 const BUCKETS = 6;
 
+// Ink blots, pre-rendered once per colour: a ragged core, a soaked halo and a
+// few specks thrown off it. Sprites rather than paths — filling thousands of
+// little polygons per frame costs an order of magnitude more.
+const STAMP_COUNT = 16;
+let stampCache = null, stampKey = "";
+function stamps(ink) {
+  if (stampCache && stampKey === ink) return stampCache;
+  const r = rng32(0x9b7d);
+  const N = 32;
+  const out = [];
+  for (let i = 0; i < STAMP_COUNT; i++) {
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const g = c.getContext("2d");
+    g.fillStyle = ink;
+    g.beginPath();
+    const n = 6 + Math.floor(r() * 4);
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + (r() - 0.5) * 0.6;
+      const rad = (0.2 + r() * 0.15) * N;
+      const x = N / 2 + Math.cos(a) * rad, y = N / 2 + Math.sin(a) * rad;
+      if (k) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.closePath();
+    g.fill();
+    g.globalAlpha = 0.4; // the soak around the blot
+    g.filter = `blur(${N * 0.1}px)`;
+    g.drawImage(c, 0, 0);
+    g.filter = "none";
+    for (let k = 0; k < 5; k++) { // specks thrown off the edge
+      const a = r() * Math.PI * 2, rad = (0.28 + r() * 0.18) * N;
+      g.globalAlpha = 0.55 * r();
+      const sz = 1 + r() * 2;
+      g.fillRect(N / 2 + Math.cos(a) * rad, N / 2 + Math.sin(a) * rad, sz, sz);
+    }
+    g.globalAlpha = 1;
+    out.push(c);
+  }
+  stampCache = out;
+  stampKey = ink;
+  return out;
+}
+
+let grainTile = null;
+function paperGrain() {
+  if (grainTile) return grainTile;
+  const n = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d");
+  const img = g.createImageData(n, n);
+  const r = rng32(0x51ce);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = r();
+    const fleck = v > 0.965 ? 1 : 0; // the odd dark speck in the stock
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = fleck ? 0 : 255 * v;
+    img.data[i + 3] = fleck ? 90 : 26 * v;
+  }
+  g.putImageData(img, 0, 0);
+  grainTile = c;
+  return c;
+}
+
+function drawDust(ctx, s) {
+  const S = CONFIG.stamp;
+  const dots = Array.from({ length: BUCKETS }, () => []);
+  for (const p of s.parts) {
+    let a = ageAlpha(s.frame - p.born, CONFIG.particle.hold, CONFIG.particle.out);
+    if (a <= 0) continue;
+    if (S.enabled) a *= p.ink * (p.nuc ? S.pool : 1);
+    dots[Math.max(0, Math.min(BUCKETS - 1, Math.floor(a * BUCKETS)))].push(p);
+  }
+
+  // the soak first, so the cores sit on top of their own halos
+  if (S.enabled && S.bleedAlpha > 0) {
+    for (let b = 0; b < BUCKETS; b++) {
+      const bucket = dots[b];
+      if (!bucket.length) continue;
+      ctx.globalAlpha = ((b + 0.5) / BUCKETS) * S.bleedAlpha;
+      ctx.beginPath();
+      for (const p of bucket) {
+        const sz = p.size * S.bleed;
+        ctx.rect(p.x - sz * 0.5, p.y - sz * 0.5, sz, sz);
+      }
+      ctx.fill();
+    }
+  }
+
+  const sp = S.enabled ? stamps(CONFIG.palette.ink) : null;
+  for (let b = 0; b < BUCKETS; b++) {
+    const bucket = dots[b];
+    if (!bucket.length) continue;
+    ctx.globalAlpha = ((b + 0.5) / BUCKETS) * 0.92;
+    ctx.beginPath();
+    for (const p of bucket) {
+      if (p.shp >= 0 && sp) continue; // blots are stamped, not filled
+      ctx.rect(p.x - p.size * 0.5, p.y - p.size * 0.5, p.size, p.size);
+    }
+    ctx.fill();
+    if (!sp) continue;
+    for (const p of bucket) {
+      if (p.shp < 0) continue;
+      const sz = p.size * S.blotScale * 2.6;
+      ctx.drawImage(sp[p.shp], p.x - sz * 0.5, p.y - sz * 0.5, sz, sz);
+    }
+  }
+}
+
 function paint(ctx, dpr, w, h, s) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = CONFIG.palette.bg;
-  ctx.fillRect(0, 0, w, h);
+  if (CONFIG.palette.bg) {
+    ctx.fillStyle = CONFIG.palette.bg;
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.clearRect(0, 0, w, h); // let whatever is behind the canvas show through
+  }
   ctx.fillStyle = CONFIG.palette.ink;
   ctx.strokeStyle = CONFIG.palette.ink;
   ctx.lineCap = "round";
@@ -149,6 +278,7 @@ function paint(ctx, dpr, w, h, s) {
     ctx.lineWidth = CONFIG.spine.width;
     const paths = Array.from({ length: BUCKETS }, () => []);
     for (let i = 1; i < spine.length; i++) {
+      if (spine[i].brk) continue; // pen-up: no segment joins these two
       const a = ageAlpha(s.frame - spine[i - 1].born, CONFIG.spine.hold, CONFIG.spine.out);
       if (a <= 0) continue;
       const b = Math.min(BUCKETS - 1, Math.floor(a * BUCKETS));
@@ -182,23 +312,18 @@ function paint(ctx, dpr, w, h, s) {
   }
   if (anyWhisker) ctx.stroke();
 
-  // the dust itself — one filled path per alpha bucket
-  const dots = Array.from({ length: BUCKETS }, () => []);
-  for (const p of s.parts) {
-    const a = ageAlpha(s.frame - p.born, CONFIG.particle.hold, CONFIG.particle.out);
-    if (a <= 0) continue;
-    dots[Math.min(BUCKETS - 1, Math.floor(a * BUCKETS))].push(p);
-  }
-  for (let b = 0; b < BUCKETS; b++) {
-    const bucket = dots[b];
-    if (!bucket.length) continue;
-    ctx.globalAlpha = ((b + 0.5) / BUCKETS) * 0.92;
-    ctx.beginPath();
-    for (const p of bucket) {
-      const sz = p.size;
-      ctx.rect(p.x - sz * 0.5, p.y - sz * 0.5, sz, sz);
-    }
-    ctx.fill();
+  drawDust(ctx, s);
+
+  // grain over the ink only — source-atop keeps it off bare ground
+  if (CONFIG.stamp.enabled && CONFIG.stamp.grain > 0) {
+    const g = CONFIG.stamp.grainScale;
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = CONFIG.stamp.grain;
+    ctx.scale(g, g);
+    ctx.fillStyle = ctx.createPattern(paperGrain(), "repeat");
+    ctx.fillRect(0, 0, w / g, h / g);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
   }
   ctx.globalAlpha = 1;
 }
@@ -221,10 +346,16 @@ export function mountLeroyCursor(canvas, opts = {}) {
     w: 0, h: 0, frame: 0,
     auto: opts.auto ?? CONFIG.auto.enabled,
     autoT: 0,
+    // A driver traces a path instead of the pointer: driver(frame) returns
+    // {x, y, penUp} while it still has something to lay down, else null.
+    driver: opts.driver ?? null,
+    smoothing: opts.smoothing ?? null, // 1 = track the driver exactly
+    pointer: null,                     // last real pointer position, for repel
   };
+  const ratio = () => opts.pixelRatio ?? window.devicePixelRatio ?? 1;
 
   function resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = ratio();
     const w = canvas.clientWidth || window.innerWidth;
     const h = canvas.clientHeight || window.innerHeight;
     if (!w || !h) return;
@@ -232,8 +363,10 @@ export function mountLeroyCursor(canvas, opts = {}) {
     canvas.height = Math.round(h * dpr);
     s.w = w; s.h = h;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = CONFIG.palette.bg;
-    ctx.fillRect(0, 0, w, h);
+    if (CONFIG.palette.bg) {
+      ctx.fillStyle = CONFIG.palette.bg;
+      ctx.fillRect(0, 0, w, h);
+    }
   }
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
@@ -287,11 +420,19 @@ export function mountLeroyCursor(canvas, opts = {}) {
     const { spread, speed, max } = CONFIG.emit;
     const P = CONFIG.particle;
     for (let i = 0; i < n; i++) {
-      if (s.parts.length >= max) return;
+      // At the cap, recycle the oldest dust rather than refusing to shed — so a
+      // trace that never fades (a persisting one) still keeps laying down new
+      // ground instead of starving everything after the first stretch.
+      const recycle = s.parts.length >= max;
+      if (recycle && s.frame - s.parts[0].born < 2) return;
       const a = heading + Math.PI * 0.5 * (s.rng() < 0.5 ? 1 : -1) + (s.rng() - 0.5) * 1.6;
       const r = s.rng() * spread;
       const big = s.rng() < P.bigChance;
-      s.parts.push({
+      const S = CONFIG.stamp;
+      const born = {
+        // how well the ground takes ink here, and which ragged stamp it makes
+        ink: S.enabled ? 1 - S.mottle * valueNoise(x * S.mottleScale, y * S.mottleScale) : 1,
+        shp: S.enabled && s.rng() < S.blotChance ? Math.floor(s.rng() * STAMP_COUNT) : -1,
         x: x + Math.cos(a) * r,
         y: y + Math.sin(a) * r,
         vx: Math.cos(a) * speed * s.rng(),
@@ -302,7 +443,11 @@ export function mountLeroyCursor(canvas, opts = {}) {
         rq: 0,
         pa: 0,
         trail: s.rng() < P.trailChance ? [] : null,
-      });
+      };
+      if (recycle) {
+        s.parts.shift();
+        s.parts.push(born);
+      } else s.parts.push(born);
     }
   }
 
@@ -319,12 +464,21 @@ export function mountLeroyCursor(canvas, opts = {}) {
     }
   }
 
-  function feedPointer(rawX, rawY) {
+  function feedPointer(rawX, rawY, penUp) {
+    if (penUp) {
+      // lift the pen: start a fresh stroke here, with no segment joining back
+      s.smooth = { x: rawX, y: rawY };
+      s.last = { x: rawX, y: rawY };
+      s.spineCount++;
+      s.spine.push({ x: rawX, y: rawY, born: s.frame, brk: true });
+      return;
+    }
+    const sm = s.smoothing ?? CONFIG.trail.smoothing;
     if (!s.smooth) s.smooth = { x: rawX, y: rawY };
     else
       s.smooth = {
-        x: s.smooth.x + (rawX - s.smooth.x) * CONFIG.trail.smoothing,
-        y: s.smooth.y + (rawY - s.smooth.y) * CONFIG.trail.smoothing,
+        x: s.smooth.x + (rawX - s.smooth.x) * sm,
+        y: s.smooth.y + (rawY - s.smooth.y) * sm,
       };
     const cx = s.smooth.x, cy = s.smooth.y;
 
@@ -358,9 +512,14 @@ export function mountLeroyCursor(canvas, opts = {}) {
   // --- simulation -----------------------------------------------------------
   function step() {
     const P = CONFIG.particle, C = CONFIG.condense;
+    // The pointer shoves dust around: free dust is pushed out of the way and
+    // packed dust is knocked off its nucleus, to drift and re-condense.
+    const rep = opts.repel;
+    const pt = rep && s.pointer;
+    const repR2 = rep ? rep.radius * rep.radius : 0;
 
     // nuclei age out; their globules dissolve back into dust
-    const nucLife = PARTICLE_LIFE * 0.95;
+    const nucLife = particleLife() * 0.95;
     s.nuclei = s.nuclei.filter((n) => s.frame - n.born <= nucLife);
     const byId = new Map();
     for (const n of s.nuclei) { n.count = 0; byId.set(n.id, n); }
@@ -376,6 +535,21 @@ export function mountLeroyCursor(canvas, opts = {}) {
         p.nuc = 0;
         p.vx += (s.rng() - 0.5) * 1.2;
         p.vy += (s.rng() - 0.5) * 1.2;
+      }
+
+      if (pt) {
+        const dx = p.x - pt.x, dy = p.y - pt.y, d2 = dx * dx + dy * dy;
+        if (d2 < repR2) {
+          const d = Math.sqrt(d2) || 1;
+          const f = rep.strength * (1 - d / rep.radius);
+          if (nuc && d < rep.radius * 0.6) { p.nuc = 0; nuc = undefined; }
+          p.vx += (dx / d) * f;
+          p.vy += (dy / d) * f;
+          if (nuc) { // shoved but still held — move it directly, it is pinned
+            p.x += (dx / d) * f * 0.6;
+            p.y += (dy / d) * f * 0.6;
+          }
+        }
       }
 
       if (nuc) {
@@ -446,11 +620,11 @@ export function mountLeroyCursor(canvas, opts = {}) {
     // cull
     s.parts = s.parts.filter(
       (p) =>
-        s.frame - p.born <= PARTICLE_LIFE &&
+        s.frame - p.born <= particleLife() &&
         p.x > -40 && p.x < s.w + 40 && p.y > -40 && p.y < s.h + 40,
     );
     let cut = 0;
-    while (cut < s.spine.length && s.frame - s.spine[cut].born > SPINE_LIFE) cut++;
+    while (cut < s.spine.length && s.frame - s.spine[cut].born > spineLife()) cut++;
     if (cut) s.spine.splice(0, cut);
   }
 
@@ -458,10 +632,14 @@ export function mountLeroyCursor(canvas, opts = {}) {
   const tick = () => {
     raf = requestAnimationFrame(tick);
     if (s.w === 0) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = ratio();
     s.frame++;
 
-    if (s.auto) {
+    if (s.driver) {
+      const p = s.driver(s.frame);
+      if (p) feedPointer(p.x, p.y, p.penUp);
+      s.raw = null; // the driver feeds directly; nothing to replay below
+    } else if (s.auto) {
       const t = s.autoT;
       s.raw = {
         x: s.w * 0.5 + Math.cos(t) * s.w * 0.27 + Math.cos(t * 2.7 + 0.9) * s.w * 0.1,
@@ -480,12 +658,19 @@ export function mountLeroyCursor(canvas, opts = {}) {
 
   const rel = (clientX, clientY) => {
     const r = canvas.getBoundingClientRect();
-    s.raw = { x: clientX - r.left, y: clientY - r.top };
+    // the canvas may be CSS-scaled (the poster is), so map back to its own space
+    const sx = canvas.clientWidth / (r.width || 1);
+    const sy = canvas.clientHeight / (r.height || 1);
+    const p = { x: (clientX - r.left) * sx, y: (clientY - r.top) * sy };
+    s.pointer = p;
+    if (!s.auto && !s.driver) s.raw = p;
   };
-  const onMove = (e) => { if (!s.auto) rel(e.clientX, e.clientY); };
-  const onTouch = (e) => { if (!s.auto && e.touches[0]) rel(e.touches[0].clientX, e.touches[0].clientY); };
+  const onMove = (e) => rel(e.clientX, e.clientY);
+  const onTouch = (e) => { if (e.touches[0]) rel(e.touches[0].clientX, e.touches[0].clientY); };
+  const onLeave = () => { s.pointer = null; };
   canvas.addEventListener("mousemove", onMove);
   canvas.addEventListener("touchmove", onTouch, { passive: true });
+  canvas.addEventListener("mouseleave", onLeave);
 
   function reset() {
     s.spine = [];
@@ -504,10 +689,16 @@ export function mountLeroyCursor(canvas, opts = {}) {
       reset();
       s.autoT = 0;
       s.rng = rng32((Date.now() & 0x7fffffff) >>> 0);
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = ratio();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = CONFIG.palette.bg;
-      ctx.fillRect(0, 0, s.w, s.h);
+      ctx.clearRect(0, 0, s.w, s.h);
+      if (CONFIG.palette.bg) {
+        ctx.fillStyle = CONFIG.palette.bg;
+        ctx.fillRect(0, 0, s.w, s.h);
+      }
+    },
+    setDriver(fn) {
+      s.driver = fn || null;
     },
     setAuto(v) {
       s.auto = !!v;
@@ -523,6 +714,7 @@ export function mountLeroyCursor(canvas, opts = {}) {
       ro.disconnect();
       canvas.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("touchmove", onTouch);
+      canvas.removeEventListener("mouseleave", onLeave);
     },
   };
 }
