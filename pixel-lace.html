@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leroy — pixel lace</title>
+  <style>
+    :root { --pane: #0e1113; --line: #23292c; --txt: #c9d3d6; --dim: #79878c; --hi: #2fe36a; }
+    html, body { margin: 0; height: 100%; background: #0a0d0e; color: var(--txt);
+      font: 12px/1.45 system-ui, sans-serif; overflow: hidden; }
+    #wrap { display: flex; height: 100%; }
+    #stageWrap { flex: 1; overflow: hidden; position: relative; }
+    #stage { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+    #drop { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+      color: var(--dim); opacity: 0; transition: opacity .15s; font-size: 14px; }
+    #drop.on { opacity: 1; background: rgba(10,13,14,.75); }
+
+    aside { width: 290px; border-left: 1px solid var(--line); background: var(--pane);
+      overflow-y: auto; padding: 14px; }
+    h2 { margin: 18px 0 8px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--dim); font-weight: 500; }
+    h2:first-child { margin-top: 0; }
+    label { display: block; margin-bottom: 8px; }
+    label > span { display: flex; justify-content: space-between; color: var(--dim); margin-bottom: 2px; }
+    label > span b { color: var(--txt); font-weight: 500; font-variant-numeric: tabular-nums; }
+    input[type=range] { width: 100%; accent-color: var(--hi); }
+    select { width: 100%; box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--line);
+      border-radius: 6px; background: #0a0d0e; color: var(--txt); font: inherit; }
+    input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid var(--line);
+      border-radius: 6px; background: #0a0d0e; }
+    .row { display: flex; gap: 6px; }
+    .row > * { flex: 1; }
+    button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+      background: transparent; color: var(--txt); cursor: pointer; font: inherit; }
+    button:hover { border-color: var(--hi); color: var(--hi); }
+    button[data-on="true"] { background: var(--hi); border-color: var(--hi); color: #06120a; }
+    .mini { display: flex; gap: 6px; }
+    .mini label { flex: 1; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="drop">drop artwork to stitch it onto the grid</div>
+  </div>
+
+  <aside>
+    <h2>Panel</h2>
+    <label><select id="preset">
+      <option value="1400x1000">1400 × 1000 — landscape panel</option>
+      <option value="1080x1350">1080 × 1350 — portrait post</option>
+      <option value="1080x1080">1080 × 1080 — square</option>
+      <option value="1350x1800">1350 × 1800 — 18 × 24</option>
+    </select></label>
+    <div class="row">
+      <label><span>Ground</span><input type="color" id="bg" value="#06120c" /></label>
+      <label><span>Thread</span><input type="color" id="ink" value="#2fe36a" /></label>
+    </div>
+
+    <h2>Grid</h2>
+    <label><span>Columns <b id="v-cols"></b></span>
+      <input id="cols" type="range" min="24" max="220" step="2" value="120" /></label>
+    <label><span>Gap <b id="v-gap"></b></span>
+      <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
+    <label><span>Levels <b id="v-levels"></b></span>
+      <input id="levels" type="range" min="1" max="5" step="1" value="3" /></label>
+    <label><span>Dither <b id="v-dither"></b></span>
+      <input id="dither" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
+    <label><select id="shape">
+      <option value="square">square stitch</option>
+      <option value="dot">round stitch</option>
+      <option value="cross">cross stitch</option>
+    </select></label>
+
+    <h2>Ink</h2>
+    <label><span>Threshold <b id="v-threshold"></b></span>
+      <input id="threshold" type="range" min="0.02" max="0.95" step="0.01" value="0.2" /></label>
+    <label><span>Contrast <b id="v-contrast"></b></span>
+      <input id="contrast" type="range" min="0.4" max="4" step="0.1" value="1" /></label>
+
+    <h2>Motif</h2>
+    <div class="row"><button id="shuffle">Shuffle</button><button id="useImg" data-on="false">Use image</button></div>
+    <label style="margin-top:8px"><span>Stems <b id="v-stems"></b></span>
+      <input id="stems" type="range" min="1" max="9" step="1" value="5" /></label>
+    <label><span>Spread <b id="v-spread"></b></span>
+      <input id="spread" type="range" min="0" max="1" step="0.02" value="0.38" /></label>
+    <label><span>Leafiness <b id="v-leafiness"></b></span>
+      <input id="leafiness" type="range" min="0" max="2" step="0.05" value="0.9" /></label>
+    <label><span>Weight <b id="v-weight"></b></span>
+      <input id="weight" type="range" min="0.2" max="3" step="0.1" value="0.6" /></label>
+    <label><span>Medallion <b id="v-medallion"></b></span>
+      <input id="medallion" type="range" min="0" max="0.7" step="0.02" value="0.26" /></label>
+    <label><span>Petals <b id="v-petals"></b></span>
+      <input id="petals" type="range" min="3" max="16" step="1" value="8" /></label>
+
+    <h2>Border</h2>
+    <div class="row">
+      <button id="borderBtn" data-on="true">Border</button>
+      <button id="cornersBtn" data-on="true">Corners</button>
+    </div>
+    <div class="mini" style="margin-top:8px">
+      <label><span>Inset <b id="v-inset"></b></span>
+        <input id="inset" type="range" min="0.01" max="0.16" step="0.005" value="0.05" /></label>
+      <label><span>Bands <b id="v-bands"></b></span>
+        <input id="bands" type="range" min="1" max="4" step="1" value="2" /></label>
+    </div>
+
+    <h2>Output</h2>
+    <div class="row"><button id="save">Save PNG</button></div>
+    <div style="color:var(--dim); margin-top:8px" id="info">—</div>
+  </aside>
+</div>
+
+<script type="module">
+import { drawLace, drawBorder, toGrid, drawStitches } from "./lace.js";
+
+const $ = (id) => document.getElementById(id);
+const stage = $("stage");
+const ctx = stage.getContext("2d");
+const src = document.createElement("canvas"); // the motif, before the grid
+
+const S = {
+  w: 1400, h: 1000, dpr: 2,
+  bg: "#06120c", ink: "#2fe36a",
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square",
+  threshold: 0.2, contrast: 1,
+  seed: 20260917, stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
+  border: true, corners: true, inset: 0.05, bands: 2,
+  image: null, useImage: false,
+};
+
+let grid = null;
+
+function build() {
+  const rows = Math.max(4, Math.round((S.cols * S.h) / S.w));
+  // render the motif far above grid resolution, so each cell has real coverage
+  const RES = Math.max(1200, S.cols * 10);
+  src.width = RES;
+  src.height = Math.round((RES * S.h) / S.w);
+  const g = src.getContext("2d", { willReadFrequently: true });
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, src.width, src.height);
+
+  if (S.useImage && S.image) {
+    const img = S.image;
+    const s = Math.max(src.width / img.width, src.height / img.height);
+    const iw = img.width * s, ih = img.height * s;
+    g.drawImage(img, (src.width - iw) / 2, (src.height - ih) / 2, iw, ih);
+    // luminance becomes coverage, so any artwork can be stitched
+    const d = g.getImageData(0, 0, src.width, src.height);
+    const p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255;
+      p[i + 3] = Math.round(lum * 255);
+    }
+    g.putImageData(d, 0, 0);
+    if (S.border) drawBorder(g, src.width, src.height, S);
+  } else {
+    drawLace(g, src.width, src.height, S);
+  }
+
+  grid = toGrid(src, S.cols, rows);
+  $("info").textContent = `${S.cols} × ${rows} stitches · seed ${S.seed}`;
+  draw();
+}
+
+function draw() {
+  ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  ctx.fillStyle = S.bg;
+  ctx.fillRect(0, 0, S.w, S.h);
+  if (!grid) return;
+  drawStitches(ctx, grid, {
+    w: S.w, h: S.h, ink: S.ink, levels: S.levels, threshold: S.threshold,
+    contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither, seed: S.seed,
+  });
+}
+
+function resize() {
+  stage.width = S.w * S.dpr;
+  stage.height = S.h * S.dpr;
+  stage.style.width = S.w + "px";
+  stage.style.height = S.h + "px";
+  fit();
+}
+function fit() {
+  const box = $("stageWrap").getBoundingClientRect();
+  const s = Math.min((box.width - 32) / S.w, (box.height - 32) / S.h);
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener("resize", fit);
+new ResizeObserver(fit).observe($("stageWrap"));
+
+// grid/ink params only need a redraw; motif params need the motif again
+const bind = (id, key, redrawOnly = false, fmt = (v) => v) => {
+  const el = $(id), out = $("v-" + id);
+  const apply = () => {
+    S[key] = el.type === "range" ? +el.value : el.value;
+    if (out) out.textContent = fmt(S[key]);
+    redrawOnly ? draw() : build();
+  };
+  el.addEventListener("input", apply);
+  if (out) out.textContent = fmt(S[key]);
+};
+bind("cols", "cols");
+bind("gap", "gap", true, (v) => v.toFixed(2));
+bind("levels", "levels", true);
+bind("dither", "dither", true, (v) => v.toFixed(2));
+bind("threshold", "threshold", true, (v) => v.toFixed(2));
+bind("contrast", "contrast", true, (v) => v.toFixed(1));
+bind("stems", "stems");
+bind("spread", "spread", false, (v) => v.toFixed(2));
+bind("leafiness", "leafiness", false, (v) => v.toFixed(2));
+bind("weight", "weight", false, (v) => v.toFixed(1));
+bind("medallion", "medallion", false, (v) => v.toFixed(2));
+bind("petals", "petals");
+bind("inset", "inset", false, (v) => v.toFixed(3));
+bind("bands", "bands");
+$("shape").addEventListener("change", (e) => { S.shape = e.target.value; draw(); });
+$("bg").addEventListener("input", (e) => { S.bg = e.target.value; draw(); });
+$("ink").addEventListener("input", (e) => { S.ink = e.target.value; draw(); });
+$("preset").addEventListener("change", (e) => {
+  const [w, h] = e.target.value.split("x").map(Number);
+  S.w = w; S.h = h;
+  resize();
+  build();
+});
+$("shuffle").addEventListener("click", () => { S.seed = (Math.random() * 1e9) | 0; build(); });
+const toggle = (id, key) => $(id).addEventListener("click", (e) => {
+  S[key] = e.currentTarget.dataset.on !== "true";
+  e.currentTarget.dataset.on = String(S[key]);
+  build();
+});
+toggle("borderBtn", "border");
+toggle("cornersBtn", "corners");
+toggle("useImg", "useImage");
+$("save").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.download = `pixel-lace-${stage.width}x${stage.height}.png`;
+  a.href = stage.toDataURL("image/png");
+  a.click();
+});
+
+const dropEl = $("drop");
+addEventListener("dragover", (e) => { e.preventDefault(); dropEl.classList.add("on"); });
+addEventListener("dragleave", () => dropEl.classList.remove("on"));
+addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropEl.classList.remove("on");
+  const f = e.dataTransfer.files[0];
+  if (!f || !f.type.startsWith("image/")) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = () => {
+    S.image = img;
+    S.useImage = true;
+    $("useImg").dataset.on = "true";
+    URL.revokeObjectURL(url);
+    build();
+  };
+  img.src = url;
+});
+
+resize();
+build();
+window.__S = S;
+window.__build = build;
+window.__draw = draw;
+</script>
+</body>
+</html>

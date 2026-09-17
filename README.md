@@ -75,6 +75,26 @@ font on the machine works with no font library and nothing fetched.
 - **Assemble** replays the dots flying in and settling. `Save PNG` exports at
   the canvas's full pixel size.
 
+## pixel-lace.html
+
+A damask panel resolved onto a stitch grid — the pixelated lace ground.
+
+The motif is drawn as ordinary vector work into an offscreen canvas at ten times
+the grid's resolution, and each cell then takes the average coverage of the
+block beneath it. Quantising that average into a few levels is what gives the
+woven look: the grid decides what survives, the way a weave does.
+
+- **Motif** — one quadrant of stems, leaves, buds and scrolls is generated from
+  a seed and mirrored four ways, which is what makes it read as damask rather
+  than as a doodle. `Spread` pushes the stems off centre so the field opens into
+  lace instead of clogging; `Shuffle` draws a new one.
+- **Grid** — columns, gap, stitch shape (square, round, cross), how many tonal
+  levels, and dither, which breaks flat areas into stitches instead of slabs.
+- **Ink** — threshold and contrast decide how much of the motif makes the cut.
+- **Border** — bands and corner scrolls, applied to a dropped image too.
+- **Use image** — drop any artwork and it is stitched onto the same grid by
+  luminance, which is the quickest route if you already have the lace you want.
+
 ## The ornament
 
 `ornament.js` builds the frame as strokes for the engine to trace. Each ribbon
