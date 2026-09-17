@@ -28,7 +28,9 @@ through the frame and the dust scatters, then re-condenses on its nodes.
 
 ## How it behaves
 
-- **Chain** — the smoothed pointer path, drawn thin, fading from the tail.
+- **Chain** — the smoothed pointer path. It is the skeleton the dust clings to,
+  not a mark: it is not drawn unless you set `spine.show`. The trail you see is
+  entirely particles.
 - **Precipitation** — every chain point sheds dust as it is laid down, and the
   whole live chain keeps shedding, so density accrues where the pointer has
   already been. Free dust diffuses brownianly and is held in a loose sleeve
@@ -38,6 +40,12 @@ through the frame and the dust scatters, then re-condenses on its nodes.
 - **Condensation** — dust within reach is pulled in and packs onto a shell,
   dense at the core with a loose corona. A globule grows as it packs, then
   saturates at `capacity` and stops capturing, so the rest keeps drifting.
+- **Settling** — dust is laid down, not left simmering. A particle sets once it
+  has had time to find its place (`particle.freezeAfter`, or `settleFrames` for
+  dust packed onto a nucleus) and then holds still — dust still within reach of
+  a nucleus stays awake, or it would set before it had a chance to condense. A
+  mount with `repel` wakes what the pointer passes through, so you can smudge a
+  settled trace and watch it re-condense.
 - **Dissolution** — nuclei age out; their globules release back into dust that
   drifts and fades, leaving the ghost clouds behind the live chain.
 
@@ -102,6 +110,8 @@ the engine — which is all the demo page's sliders do.
 | `condense.maxCoreR` / `capacity` | how big and how dense a globule gets |
 | `nucleate.crossDist` / `crossAgeGap` | what counts as the chain crossing itself |
 | `nucleate.slowSpeed` / `slowFrames` | how much dwelling it takes to bead up |
+| `particle.freezeAfter` / `settleFrames` | how long before dust sets and stops moving |
+| `spine.show` / `width` | draw the chain itself, off by default |
 | `fade` (`spine.hold/out`, `particle.hold/out`) | how long any of it survives |
 | `stamp.bleed` / `bleedAlpha` | the soak halo under each dot |
 | `stamp.blotChance` / `blotScale` | how much of the dust lands as ragged blots |

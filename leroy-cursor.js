@@ -14,7 +14,9 @@ const CONFIG = {
     smoothing: 0.16, // applied once per frame — lower = smoother/laggier
     maxSteps: 40,
   },
-  spine: { width: 0.9, hold: 330, out: 190 },
+  // The chain is the skeleton the dust clings to; `show` only decides whether
+  // it is also drawn. Off by default — the trail is the particles.
+  spine: { show: false, width: 0.9, hold: 330, out: 190 },
 
   // Precipitation off the chain.
   emit: {
@@ -41,6 +43,10 @@ const CONFIG = {
     bigSize: 2,
     trailChance: 0.035, // a few particles leave stray whiskers
     trailLen: 9,
+    // Dust settles and then holds still — it is laid down, not simmering. The
+    // pointer (with `repel`) is the only thing that wakes it again.
+    freezeAfter: 70,   // frames adrift before a free particle sets (0 = never)
+    settleFrames: 22,  // frames on a nucleus before packed dust sets
   },
 
   // Condensation onto nuclei.
@@ -274,7 +280,7 @@ function paint(ctx, dpr, w, h, s) {
 
   // the chain, segment alpha bucketed by age
   const spine = s.spine;
-  if (spine.length > 1) {
+  if (CONFIG.spine.show && spine.length > 1) {
     ctx.lineWidth = CONFIG.spine.width;
     const paths = Array.from({ length: BUCKETS }, () => []);
     for (let i = 1; i < spine.length; i++) {
@@ -359,8 +365,12 @@ export function mountLeroyCursor(canvas, opts = {}) {
     const w = canvas.clientWidth || window.innerWidth;
     const h = canvas.clientHeight || window.innerHeight;
     if (!w || !h) return;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+    const cw = Math.round(w * dpr), ch = Math.round(h * dpr);
+    // Setting width/height wipes the canvas, and the observer also fires for
+    // sizes that did not change — so bail out unless it really did.
+    if (canvas.width === cw && canvas.height === ch && s.w === w && s.h === h) return;
+    canvas.width = cw;
+    canvas.height = ch;
     s.w = w; s.h = h;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (CONFIG.palette.bg) {
@@ -440,6 +450,8 @@ export function mountLeroyCursor(canvas, opts = {}) {
         born: s.frame,
         size: big ? P.bigSize : P.size * (0.75 + s.rng() * 0.5),
         nuc: 0,
+        bindAt: 0,
+        fixed: false,
         rq: 0,
         pa: 0,
         trail: s.rng() < P.trailChance ? [] : null,
@@ -533,8 +545,19 @@ export function mountLeroyCursor(canvas, opts = {}) {
       let nuc = p.nuc ? byId.get(p.nuc) : undefined;
       if (!nuc && p.nuc) { // its nucleus dissolved — kick it loose
         p.nuc = 0;
+        p.fixed = false;
         p.vx += (s.rng() - 0.5) * 1.2;
         p.vy += (s.rng() - 0.5) * 1.2;
+      }
+
+      if (p.fixed) {
+        // set: it still counts toward its globule, but nothing moves it until
+        // the pointer comes through
+        if (nuc) nuc.count++;
+        if (!pt) continue;
+        const dx = p.x - pt.x, dy = p.y - pt.y;
+        if (dx * dx + dy * dy >= repR2) continue;
+        p.fixed = false;
       }
 
       if (pt) {
@@ -552,6 +575,7 @@ export function mountLeroyCursor(canvas, opts = {}) {
         }
       }
 
+      let inReach = false;
       if (nuc) {
         // bound: hold a noisy shell radius, which grows as the globule packs
         nuc.count++;
@@ -566,11 +590,13 @@ export function mountLeroyCursor(canvas, opts = {}) {
       } else {
         // free: brownian + curl drift + a weak pull back onto the chain
         const ni = nearestIn(p.x, p.y, s.nuclei, nucGrid, Math.max(16, C.captureR), capture2);
+        inReach = ni >= 0;
         if (ni >= 0) {
           const n = s.nuclei[ni];
           const dx = n.x - p.x, dy = n.y - p.y, d = Math.hypot(dx, dy) || 1;
           if (d < n.coreR * 1.3 && n.count < C.capacity) {
             p.nuc = n.id;
+            p.bindAt = s.frame;
             // most of it packs into the core; the rest hangs in a loose corona
             p.rq =
               s.rng() < C.haloChance
@@ -608,6 +634,14 @@ export function mountLeroyCursor(canvas, opts = {}) {
       if (p.trail) {
         p.trail.push(p.x, p.y);
         if (p.trail.length > P.trailLen * 2) p.trail.splice(0, 2);
+      }
+
+      // settle, once it has had time to find its place — but dust still within
+      // reach of a nucleus stays awake, or it would set before it condenses
+      if (P.freezeAfter > 0) {
+        p.fixed = p.nuc
+          ? s.frame - p.bindAt >= P.settleFrames
+          : !inReach && s.frame - p.born >= P.freezeAfter;
       }
     }
 
@@ -656,8 +690,15 @@ export function mountLeroyCursor(canvas, opts = {}) {
   };
   raf = requestAnimationFrame(tick);
 
+  // getBoundingClientRect forces a layout flush, and pointer events can arrive
+  // several times a frame — so read it at most once per frame.
+  let rectCache = null, rectFrame = -1;
   const rel = (clientX, clientY) => {
-    const r = canvas.getBoundingClientRect();
+    if (rectFrame !== s.frame || !rectCache) {
+      rectCache = canvas.getBoundingClientRect();
+      rectFrame = s.frame;
+    }
+    const r = rectCache;
     // the canvas may be CSS-scaled (the poster is), so map back to its own space
     const sx = canvas.clientWidth / (r.width || 1);
     const sy = canvas.clientHeight / (r.height || 1);
