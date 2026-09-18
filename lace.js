@@ -145,18 +145,9 @@ function border(g, w, h, o) {
   }
 }
 
-// Draws the whole panel, mirrored four ways, at whatever resolution is asked.
-export function drawLace(g, w, h, o) {
-  const seed = o.seed >>> 0;
-  g.clearRect(0, 0, w, h);
-  g.fillStyle = "#fff";
-  g.strokeStyle = "#fff";
-  g.lineCap = "round";
-  g.lineJoin = "round";
-
+// The motif itself, composed to fill whatever box it is handed.
+function motif(g, w, h, qo, seed, o) {
   const cx = w / 2, cy = h / 2;
-  const weight = Math.min(w, h) * 0.006 * o.weight;
-  const qo = { stems: o.stems, weight, leafiness: o.leafiness, petals: o.petals, spread: o.spread ?? 0.35 };
   const R = Math.min(w, h) / 2;
   const at = (fn) => { g.save(); g.translate(cx, cy); fn(); g.restore(); };
 
@@ -206,6 +197,32 @@ export function drawLace(g, w, h, o) {
     medallion(g, Math.min(w, h) * 0.5 * o.medallion, qo, seed);
     g.restore();
   }
+}
+
+// Draws the whole panel at whatever resolution is asked. The motif is composed
+// into the field the border encloses and clipped to it, so it fills that field
+// rather than running under the frame and off the edge of the panel.
+export function drawLace(g, w, h, o) {
+  const seed = o.seed >>> 0;
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "#fff";
+  g.strokeStyle = "#fff";
+  g.lineCap = "round";
+  g.lineJoin = "round";
+
+  // stroke weight stays tied to the panel, so the frame and the motif match
+  const weight = Math.min(w, h) * 0.006 * o.weight;
+  const qo = { stems: o.stems, weight, leafiness: o.leafiness, petals: o.petals, spread: o.spread ?? 0.35 };
+
+  const f = fieldRect(w, h, o);
+  g.save();
+  g.beginPath();
+  g.rect(f.x, f.y, f.w, f.h);
+  g.clip();
+  g.translate(f.x, f.y);
+  motif(g, f.w, f.h, qo, seed, o);
+  g.restore();
+
   if (o.border) {
     border(g, w, h, {
       inset: Math.min(w, h) * o.inset, bands: o.bands, weight, corners: o.corners,
