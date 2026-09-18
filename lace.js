@@ -354,11 +354,13 @@ const BAYER = [
   [0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5],
 ].flat().map((v) => (v + 0.5) / 16);
 
-export function drawStitches(ctx, grid, o) {
+// Which cells get a stitch, and at what level — worked out once and shared by
+// the canvas and the SVG, so the file is what you were looking at.
+export function stitchCells(grid, o) {
   const { cols, rows, cells } = grid;
   const {
-    x = 0, y = 0, w, h, ink = "#2fe36a", levels = 3, threshold = 0.5,
-    contrast = 1, gap = 0.18, shape = "square", dither = 0.35, seed = 7,
+    x = 0, y = 0, w, h, levels = 3, threshold = 0.5,
+    contrast = 1, gap = 0.18, dither = 0.35, seed = 7,
   } = o;
   const cw = w / cols, ch = h / rows;
   const size = Math.min(cw, ch) * (1 - gap);
@@ -366,40 +368,85 @@ export function drawStitches(ctx, grid, o) {
   const noise = new Float32Array(cols * rows);
   for (let i = 0; i < noise.length; i++) noise[i] = rnd();
 
+  const byLevel = Array.from({ length: levels + 1 }, () => []);
+  for (let ry = 0; ry < rows; ry++) {
+    for (let rx = 0; rx < cols; rx++) {
+      const i = ry * cols + rx;
+      // threshold is a floor, not a pivot: below it the cell stays bare, and
+      // what is left is stretched back over the full range. Without that, a
+      // photograph's dark ground still stitches a dim cell everywhere.
+      let v = (cells[i] - threshold) / Math.max(0.001, 1 - threshold);
+      if (v <= 0) continue;
+      v = Math.max(0, Math.min(1, 0.5 + (v - 0.5) * contrast));
+      if (v <= 0) continue;
+      const d = (BAYER[(ry % 4) * 4 + (rx % 4)] - 0.5) * dither
+        + (noise[i] - 0.5) * dither * 0.6;
+      const lv = Math.ceil(Math.max(0, Math.min(1, v + d)) * levels);
+      if (lv < 1) continue;
+      byLevel[Math.min(levels, lv)].push([
+        x + rx * cw + (cw - size) / 2,
+        y + ry * ch + (ch - size) / 2,
+      ]);
+    }
+  }
+  return { byLevel, size, levels };
+}
+
+export function drawStitches(ctx, grid, o) {
+  const { ink = "#2fe36a", shape = "square" } = o;
+  const { byLevel, size, levels } = stitchCells(grid, o);
   ctx.fillStyle = ink;
   ctx.strokeStyle = ink;
   for (let l = 1; l <= levels; l++) {
+    if (!byLevel[l].length) continue;
     ctx.globalAlpha = l / levels;
     ctx.beginPath();
-    for (let ry = 0; ry < rows; ry++) {
-      for (let rx = 0; rx < cols; rx++) {
-        const i = ry * cols + rx;
-        // threshold is a floor, not a pivot: below it the cell stays bare, and
-        // what is left is stretched back over the full range. Without that, a
-        // photograph's dark ground still stitches a dim cell everywhere.
-        let v = (cells[i] - threshold) / Math.max(0.001, 1 - threshold);
-        if (v <= 0) continue;
-        v = Math.max(0, Math.min(1, 0.5 + (v - 0.5) * contrast));
-        if (v <= 0) continue;
-        const d = (BAYER[(ry % 4) * 4 + (rx % 4)] - 0.5) * dither
-          + (noise[i] - 0.5) * dither * 0.6;
-        const lv = Math.ceil(Math.max(0, Math.min(1, v + d)) * levels);
-        if (lv !== l) continue;
-        const px = x + rx * cw + (cw - size) / 2;
-        const py = y + ry * ch + (ch - size) / 2;
-        if (shape === "dot") {
-          ctx.moveTo(px + size, py + size / 2);
-          ctx.arc(px + size / 2, py + size / 2, size / 2, 0, Math.PI * 2);
-        } else if (shape === "cross") {
-          const t = size * 0.34;
-          ctx.rect(px, py + (size - t) / 2, size, t);
-          ctx.rect(px + (size - t) / 2, py, t, size);
-        } else {
-          ctx.rect(px, py, size, size);
-        }
+    for (const [px, py] of byLevel[l]) {
+      if (shape === "dot") {
+        ctx.moveTo(px + size, py + size / 2);
+        ctx.arc(px + size / 2, py + size / 2, size / 2, 0, Math.PI * 2);
+      } else if (shape === "cross") {
+        const t = size * 0.34;
+        ctx.rect(px, py + (size - t) / 2, size, t);
+        ctx.rect(px + (size - t) / 2, py, t, size);
+      } else {
+        ctx.rect(px, py, size, size);
       }
     }
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
+
+// The same stitches as vector: one path per tonal level, which keeps the file
+// small and leaves it editable as a handful of objects rather than thousands.
+export function toSVG(grid, o) {
+  const { ink = "#2fe36a", shape = "square", w, h, bg = null } = o;
+  const { byLevel, size, levels } = stitchCells(grid, o);
+  const n = (v) => Math.round(v * 100) / 100;
+  const r = n(size / 2);
+  const out = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">`,
+  ];
+  if (bg) out.push(`<rect width="${n(w)}" height="${n(h)}" fill="${bg}"/>`);
+  for (let l = 1; l <= levels; l++) {
+    const cellsAt = byLevel[l];
+    if (!cellsAt.length) continue;
+    const d = [];
+    for (const [px, py] of cellsAt) {
+      const x = n(px), y = n(py), s = n(size);
+      if (shape === "dot") {
+        d.push(`M${n(x)} ${n(y + r)}a${r} ${r} 0 1 0 ${n(size)} 0a${r} ${r} 0 1 0 ${n(-size)} 0z`);
+      } else if (shape === "cross") {
+        const t = n(size * 0.34), off = n((size - size * 0.34) / 2);
+        d.push(`M${x} ${n(y + off)}h${s}v${t}h${-s}z`);
+        d.push(`M${n(x + off)} ${y}h${t}v${s}h${-t}z`);
+      } else {
+        d.push(`M${x} ${y}h${s}v${s}h${-s}z`);
+      }
+    }
+    out.push(`<path fill="${ink}" fill-opacity="${n(l / levels)}" d="${d.join("")}"/>`);
+  }
+  out.push("</svg>");
+  return out.join("\n");
 }

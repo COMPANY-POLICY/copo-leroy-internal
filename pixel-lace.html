@@ -151,13 +151,13 @@
     </div>
 
     <h2>Output</h2>
-    <div class="row"><button id="save">Save PNG</button></div>
+    <div class="row"><button id="save">Save PNG</button><button id="saveSvg">Save SVG</button></div>
     <div style="color:var(--dim); margin-top:8px" id="info">—</div>
   </aside>
 </div>
 
 <script type="module">
-import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches } from "./lace.js";
+import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches, toSVG } from "./lace.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -237,6 +237,7 @@ function build() {
   }
 
   grid = toGrid(src, S.cols, rows);
+  window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const what = usingImage ? (S.source === "imageLace" ? "image laced" : "image") : `seed ${S.seed}`;
   $("info").textContent = `${S.cols} × ${rows} stitches · ${S.symmetry} · ${what}`;
   draw();
@@ -395,11 +396,24 @@ const toggle = (id, key) => $(id).addEventListener("click", (e) => {
 toggle("borderBtn", "border");
 toggle("cornersBtn", "corners");
 toggle("invert", "invert");
-$("save").addEventListener("click", () => {
+const download = (href, name) => {
   const a = document.createElement("a");
-  a.download = `pixel-lace-${stage.width}x${stage.height}.png`;
-  a.href = stage.toDataURL("image/png");
+  a.download = name;
+  a.href = href;
   a.click();
+};
+$("save").addEventListener("click", () =>
+  download(stage.toDataURL("image/png"), `pixel-lace-${stage.width}x${stage.height}.png`));
+$("saveSvg").addEventListener("click", () => {
+  if (!grid) return;
+  const svg = toSVG(grid, {
+    w: S.w, h: S.h, ink: S.ink, levels: S.levels, threshold: S.threshold,
+    contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither, seed: S.seed,
+    bg: S.alpha ? null : S.bg,
+  });
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  download(url, `pixel-lace-${S.w}x${S.h}.svg`);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 function loadImage(file) {
