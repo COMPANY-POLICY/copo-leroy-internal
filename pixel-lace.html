@@ -35,6 +35,8 @@
     input[type=range] { width: 100%; accent-color: var(--hi); }
     select { width: 100%; box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--line);
       border-radius: 6px; background: #0a0d0e; color: var(--txt); font: inherit; }
+    input[type=number] { box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--line);
+      border-radius: 6px; background: #0a0d0e; color: var(--txt); font: inherit; }
     input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid var(--line);
       border-radius: 6px; background: #0a0d0e; }
     .row { display: flex; gap: 6px; }
@@ -51,7 +53,7 @@
 <div id="wrap">
   <div id="stageWrap">
     <canvas id="stage"></canvas>
-    <div id="drop">drop artwork to stitch it onto the grid</div>
+    <div id="drop">drop an image — it comes back as lace</div>
   </div>
 
   <aside>
@@ -90,7 +92,39 @@
       <input id="contrast" type="range" min="0.4" max="4" step="0.1" value="1" /></label>
 
     <h2>Motif</h2>
-    <div class="row"><button id="shuffle">Shuffle</button><button id="useImg" data-on="false">Use image</button></div>
+    <label><span>Seed</span>
+      <div class="row">
+        <button id="seedDown" style="flex:0 0 32px">◀</button>
+        <input type="number" id="seed" value="20260917" style="flex:1; text-align:center" />
+        <button id="seedUp" style="flex:0 0 32px">▶</button>
+      </div>
+    </label>
+    <div class="row"><button id="shuffle">Shuffle</button><button id="copyLink">Copy link</button></div>
+    <label style="margin-top:8px"><span>Symmetry</span><select id="symmetry">
+      <option value="mirror4">mirrored — both axes</option>
+      <option value="mirrorX">mirrored — one axis</option>
+      <option value="rot4">turned — four-fold</option>
+      <option value="kaleido8">kaleidoscope — eight</option>
+      <option value="tile">half-drop repeat</option>
+    </select></label>
+    <label id="repeatRow" style="display:none"><span>Repeat <b id="v-repeat"></b></span>
+      <input id="repeat" type="range" min="2" max="10" step="1" value="4" /></label>
+    <label style="margin-top:8px"><span>Source</span><select id="source">
+      <option value="motif">generated motif</option>
+      <option value="imageLace">image — laced</option>
+      <option value="image">image — flat</option>
+    </select></label>
+    <div class="row">
+      <button id="upload">Upload image…</button>
+      <button id="invert" data-on="false">Invert</button>
+    </div>
+    <label style="margin-top:8px"><span>Read as</span><select id="read">
+      <option value="edges">edges — linework</option>
+      <option value="tone">tone — light and dark</option>
+    </select></label>
+    <label><span>Image zoom <b id="v-zoom"></b></span>
+      <input id="zoom" type="range" min="0.4" max="3" step="0.05" value="1" /></label>
+    <input type="file" id="file" accept="image/*" hidden />
     <label style="margin-top:8px"><span>Stems <b id="v-stems"></b></span>
       <input id="stems" type="range" min="1" max="9" step="1" value="5" /></label>
     <label><span>Spread <b id="v-spread"></b></span>
@@ -123,7 +157,7 @@
 </div>
 
 <script type="module">
-import { drawLace, drawBorder, toGrid, drawStitches } from "./lace.js";
+import { drawLace, drawImageLace, drawBorder, toGrid, drawStitches } from "./lace.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -135,9 +169,10 @@ const S = {
   bg: "#06120c", ink: "#2fe36a", alpha: false,
   cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square",
   threshold: 0.2, contrast: 1,
-  seed: 20260917, stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
+  seed: 20260917, symmetry: "mirror4", repeat: 4,
+  stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
   border: true, corners: true, inset: 0.05, bands: 2,
-  image: null, useImage: false,
+  image: null, source: "motif", invert: false, zoom: 1, read: "edges",
 };
 
 let grid = null;
@@ -152,17 +187,40 @@ function build() {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, src.width, src.height);
 
-  if (S.useImage && S.image) {
-    const img = S.image;
-    const s = Math.max(src.width / img.width, src.height / img.height);
-    const iw = img.width * s, ih = img.height * s;
-    g.drawImage(img, (src.width - iw) / 2, (src.height - ih) / 2, iw, ih);
-    // luminance becomes coverage, so any artwork can be stitched
+  const usingImage = S.source !== "motif" && S.image;
+  if (usingImage) {
+    if (S.source === "imageLace") drawImageLace(g, src.width, src.height, S.image, S);
+    else {
+      const img = S.image;
+      const s = Math.max(src.width / img.width, src.height / img.height);
+      g.drawImage(img, (src.width - img.width * s) / 2, (src.height - img.height * s) / 2,
+        img.width * s, img.height * s);
+    }
+    // Coverage from the picture: tone reads its light and dark, edges reads
+    // where it changes. A photograph's bright masses stitch solid under tone,
+    // so edges is what actually comes back as lace.
     const d = g.getImageData(0, 0, src.width, src.height);
     const p = d.data;
+    let blur = null;
+    if (S.read === "edges") {
+      const t = document.createElement("canvas");
+      t.width = src.width;
+      t.height = src.height;
+      const tg = t.getContext("2d", { willReadFrequently: true });
+      tg.filter = `blur(${Math.max(1, src.width / 180)}px)`;
+      tg.drawImage(src, 0, 0);
+      blur = tg.getImageData(0, 0, src.width, src.height).data;
+    }
     for (let i = 0; i < p.length; i += 4) {
+      const a0 = p[i + 3] / 255;
       const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255;
-      p[i + 3] = Math.round(lum * 255);
+      let v;
+      if (blur) {
+        const bl = (blur[i] * 0.299 + blur[i + 1] * 0.587 + blur[i + 2] * 0.114) / 255;
+        v = Math.min(1, Math.abs(lum - bl) * 6); // difference of blurs — an edge map
+      } else v = lum;
+      p[i + 3] = Math.round((S.invert ? 1 - v : v) * a0 * 255);
+      p[i] = p[i + 1] = p[i + 2] = 255;
     }
     g.putImageData(d, 0, 0);
     if (S.border) drawBorder(g, src.width, src.height, S);
@@ -171,7 +229,8 @@ function build() {
   }
 
   grid = toGrid(src, S.cols, rows);
-  $("info").textContent = `${S.cols} × ${rows} stitches · seed ${S.seed}`;
+  const what = usingImage ? (S.source === "imageLace" ? "image laced" : "image") : `seed ${S.seed}`;
+  $("info").textContent = `${S.cols} × ${rows} stitches · ${S.symmetry} · ${what}`;
   draw();
 }
 
@@ -206,54 +265,128 @@ addEventListener("resize", fit);
 new ResizeObserver(fit).observe($("stageWrap"));
 
 // grid/ink params only need a redraw; motif params need the motif again
-const bind = (id, key, redrawOnly = false, fmt = (v) => v) => {
+const f2 = (v) => v.toFixed(2);
+const SLIDERS = [
+  ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
+  ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
+  ["contrast", "contrast", true, (v) => v.toFixed(1)],
+  ["stems", "stems", false], ["spread", "spread", false, f2],
+  ["leafiness", "leafiness", false, f2], ["weight", "weight", false, (v) => v.toFixed(1)],
+  ["medallion", "medallion", false, f2], ["petals", "petals", false],
+  ["inset", "inset", false, (v) => v.toFixed(3)], ["bands", "bands", false],
+  ["repeat", "repeat", false], ["zoom", "zoom", false, (v) => v.toFixed(2) + "×"],
+];
+const bind = ([id, key, redrawOnly = false, fmt = (v) => v]) => {
   const el = $(id), out = $("v-" + id);
   const apply = () => {
-    S[key] = el.type === "range" ? +el.value : el.value;
+    S[key] = +el.value;
     if (out) out.textContent = fmt(S[key]);
     redrawOnly ? draw() : build();
+    writeHash();
   };
   el.addEventListener("input", apply);
   if (out) out.textContent = fmt(S[key]);
 };
-bind("cols", "cols");
-bind("gap", "gap", true, (v) => v.toFixed(2));
-bind("levels", "levels", true);
-bind("dither", "dither", true, (v) => v.toFixed(2));
-bind("threshold", "threshold", true, (v) => v.toFixed(2));
-bind("contrast", "contrast", true, (v) => v.toFixed(1));
-bind("stems", "stems");
-bind("spread", "spread", false, (v) => v.toFixed(2));
-bind("leafiness", "leafiness", false, (v) => v.toFixed(2));
-bind("weight", "weight", false, (v) => v.toFixed(1));
-bind("medallion", "medallion", false, (v) => v.toFixed(2));
-bind("petals", "petals");
-bind("inset", "inset", false, (v) => v.toFixed(3));
-bind("bands", "bands");
-$("shape").addEventListener("change", (e) => { S.shape = e.target.value; draw(); });
-$("bg").addEventListener("input", (e) => { S.bg = e.target.value; draw(); });
-$("ink").addEventListener("input", (e) => { S.ink = e.target.value; draw(); });
+SLIDERS.forEach(bind);
+
+// write the state back into the controls (after a shuffle, or a link)
+function syncControls() {
+  for (const [id, key, , fmt = (v) => v] of SLIDERS) {
+    const el = $(id), out = $("v-" + id);
+    if (el) el.value = S[key];
+    if (out) out.textContent = fmt(S[key]);
+  }
+  $("seed").value = S.seed;
+  $("symmetry").value = S.symmetry;
+  $("source").value = S.source;
+  $("read").value = S.read;
+  $("shape").value = S.shape;
+  $("bg").value = S.bg;
+  $("ink").value = S.ink;
+  $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
+  for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
+    ["alphaBtn", "alpha"], ["invert", "invert"]]) $(id).dataset.on = String(S[key]);
+  stage.classList.toggle("alpha", S.alpha);
+}
+
+// a seed is only worth having if you can get back to it
+const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "stems", "spread", "leafiness", "weight",
+  "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha"];
+let hashLock = false;
+function writeHash() {
+  if (hashLock) return;
+  const q = new URLSearchParams();
+  for (const k of HASH_KEYS) q.set(k, String(S[k]));
+  history.replaceState(null, "", "#" + q.toString());
+}
+function readHash() {
+  if (!location.hash.length) return false;
+  const q = new URLSearchParams(location.hash.slice(1));
+  let any = false;
+  for (const k of HASH_KEYS) {
+    if (!q.has(k)) continue;
+    const v = q.get(k);
+    const cur = S[k];
+    S[k] = typeof cur === "number" ? +v : typeof cur === "boolean" ? v === "true" : v;
+    any = true;
+  }
+  return any;
+}
+$("shape").addEventListener("change", (e) => { S.shape = e.target.value; draw(); writeHash(); });
+$("source").addEventListener("change", (e) => {
+  S.source = e.target.value;
+  if (S.source !== "motif" && !S.image) $("file").click();
+  else build();
+  writeHash();
+});
+$("read").addEventListener("change", (e) => { S.read = e.target.value; build(); writeHash(); });
+$("upload").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => e.target.files[0] && loadImage(e.target.files[0]));
+$("symmetry").addEventListener("change", (e) => {
+  S.symmetry = e.target.value;
+  $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
+  build();
+  writeHash();
+});
+const setSeed = (v) => { S.seed = v >>> 0; $("seed").value = S.seed; build(); writeHash(); };
+$("seed").addEventListener("input", (e) => { S.seed = (+e.target.value || 0) >>> 0; build(); writeHash(); });
+$("seedDown").addEventListener("click", () => setSeed(S.seed - 1));
+$("seedUp").addEventListener("click", () => setSeed(S.seed + 1));
+$("copyLink").addEventListener("click", async (e) => {
+  writeHash();
+  try {
+    await navigator.clipboard.writeText(location.href);
+    const b = e.currentTarget, t = b.textContent;
+    b.textContent = "Copied";
+    setTimeout(() => (b.textContent = t), 1200);
+  } catch { /* clipboard blocked — the URL bar has it either way */ }
+});
+$("bg").addEventListener("input", (e) => { S.bg = e.target.value; draw(); writeHash(); });
+$("ink").addEventListener("input", (e) => { S.ink = e.target.value; draw(); writeHash(); });
 $("preset").addEventListener("change", (e) => {
   const [w, h] = e.target.value.split("x").map(Number);
   S.w = w; S.h = h;
   resize();
   build();
 });
-$("shuffle").addEventListener("click", () => { S.seed = (Math.random() * 1e9) | 0; build(); });
+$("shuffle").addEventListener("click", () => setSeed((Math.random() * 1e9) | 0));
 $("alphaBtn").addEventListener("click", (e) => {
   S.alpha = e.currentTarget.dataset.on !== "true";
   e.currentTarget.dataset.on = String(S.alpha);
   stage.classList.toggle("alpha", S.alpha);
   draw();
+  writeHash();
 });
 const toggle = (id, key) => $(id).addEventListener("click", (e) => {
   S[key] = e.currentTarget.dataset.on !== "true";
   e.currentTarget.dataset.on = String(S[key]);
   build();
+  writeHash();
 });
 toggle("borderBtn", "border");
 toggle("cornersBtn", "corners");
-toggle("useImg", "useImage");
+toggle("invert", "invert");
 $("save").addEventListener("click", () => {
   const a = document.createElement("a");
   a.download = `pixel-lace-${stage.width}x${stage.height}.png`;
@@ -261,6 +394,19 @@ $("save").addEventListener("click", () => {
   a.click();
 });
 
+function loadImage(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    S.image = img;
+    if (S.source === "motif") S.source = "imageLace"; // laced is the interesting one
+    $("source").value = S.source;
+    URL.revokeObjectURL(url);
+    build();
+    writeHash();
+  };
+  img.src = url;
+}
 const dropEl = $("drop");
 addEventListener("dragover", (e) => { e.preventDefault(); dropEl.classList.add("on"); });
 addEventListener("dragleave", () => dropEl.classList.remove("on"));
@@ -268,21 +414,16 @@ addEventListener("drop", (e) => {
   e.preventDefault();
   dropEl.classList.remove("on");
   const f = e.dataTransfer.files[0];
-  if (!f || !f.type.startsWith("image/")) return;
-  const url = URL.createObjectURL(f);
-  const img = new Image();
-  img.onload = () => {
-    S.image = img;
-    S.useImage = true;
-    $("useImg").dataset.on = "true";
-    URL.revokeObjectURL(url);
-    build();
-  };
-  img.src = url;
+  if (f && f.type.startsWith("image/")) loadImage(f);
 });
 
+hashLock = true;
+readHash();
+syncControls();
+hashLock = false;
 resize();
 build();
+writeHash();
 window.__S = S;
 window.__build = build;
 window.__draw = draw;

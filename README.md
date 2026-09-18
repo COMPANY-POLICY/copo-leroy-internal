@@ -84,10 +84,18 @@ the grid's resolution, and each cell then takes the average coverage of the
 block beneath it. Quantising that average into a few levels is what gives the
 woven look: the grid decides what survives, the way a weave does.
 
-- **Motif** — one quadrant of stems, leaves, buds and scrolls is generated from
-  a seed and mirrored four ways, which is what makes it read as damask rather
-  than as a doodle. `Spread` pushes the stems off centre so the field opens into
-  lace instead of clogging; `Shuffle` draws a new one.
+- **Motif** — a sprig of stems, leaves, buds and scrolls is generated from a
+  seed and repeated under a symmetry group, which is what makes it read as
+  damask rather than as a doodle. `Spread` pushes the stems off centre so the
+  field opens into lace instead of clogging.
+- **Seed** — typed in, stepped one at a time with `◀ ▶`, or thrown by
+  `Shuffle`. Every control lives in the URL, so `Copy link` hands over an exact
+  pattern and reopening a link restores it.
+- **Symmetry** — mirrored on both axes (the damask panel), mirrored on one axis
+  (the halves then differ top to bottom), turned four-fold (a pinwheel),
+  kaleidoscope of eight (a doily), or a half-drop repeat (wallpaper rather than
+  a panel). The two radial modes work off the shorter side, so they suit a
+  square panel best.
 - **Grid** — columns, gap, stitch shape (square, round, cross), how many tonal
   levels, and dither, which breaks flat areas into stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
@@ -95,8 +103,13 @@ woven look: the grid decides what survives, the way a weave does.
 - **Transparent ground** — drops the panel colour so the PNG exports as the
   lace alone, to lay over a photograph or a product shot. The lower tonal
   levels stay semi-transparent, which is what you want over a busy ground.
-- **Use image** — drop any artwork and it is stitched onto the same grid by
-  luminance, which is the quickest route if you already have the lace you want.
+- **Image** — upload or drop one and it comes back as lace: `image — laced`
+  puts it through the same symmetry group as the motif, so a photograph is
+  mirrored into a damask; `image — flat` just stitches it as it is. `Read as`
+  decides what becomes thread — `edges` traces where the picture changes, which
+  is what actually reads as lace, while `tone` follows its light and dark and
+  stitches bright masses solid. `Image zoom` frames the crop, `Invert` swaps
+  which side of it survives.
 
 ## The ornament
 
