@@ -79,6 +79,11 @@ font on the machine works with no font library and nothing fetched.
 
 A damask panel resolved onto a stitch grid — the pixelated lace ground.
 
+Sized from the presets (4:5, 9:16 story, square, link preview, 16:9, 18 × 24
+print) or from the width and height fields, which show the ratio as you type and
+flip the preset to `custom`. The size travels in the shareable link with
+everything else.
+
 The motif is drawn as ordinary vector work into an offscreen canvas at ten times
 the grid's resolution, and each cell then takes the average coverage of the
 block beneath it. Quantising that average into a few levels is what gives the

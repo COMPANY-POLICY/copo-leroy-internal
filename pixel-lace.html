@@ -59,11 +59,22 @@
   <aside>
     <h2>Panel</h2>
     <label><select id="preset">
-      <option value="1400x1000">1400 × 1000 — landscape panel</option>
-      <option value="1080x1350">1080 × 1350 — portrait post</option>
+      <option value="1080x1350">1080 × 1350 — portrait 4:5</option>
+      <option value="1080x1920">1080 × 1920 — story 9:16</option>
       <option value="1080x1080">1080 × 1080 — square</option>
-      <option value="1350x1800">1350 × 1800 — 18 × 24</option>
+      <option value="1200x1500">1200 × 1500 — portrait 4:5 large</option>
+      <option value="1200x630">1200 × 630 — link preview</option>
+      <option value="1920x1080">1920 × 1080 — landscape 16:9</option>
+      <option value="1400x1000">1400 × 1000 — landscape panel</option>
+      <option value="1350x1800">1350 × 1800 — 18 × 24 print</option>
+      <option value="custom">custom…</option>
     </select></label>
+    <div class="mini">
+      <label><span>Width <b id="v-ar"></b></span>
+        <input type="number" id="pw" min="200" max="4000" step="10" value="1400" /></label>
+      <label><span>Height</span>
+        <input type="number" id="ph" min="200" max="4000" step="10" value="1000" /></label>
+    </div>
     <div class="row">
       <label><span>Ground</span><input type="color" id="bg" value="#06120c" /></label>
       <label><span>Thread</span><input type="color" id="ink" value="#ffffff" /></label>
@@ -321,7 +332,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha"];
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -373,12 +384,30 @@ $("copyLink").addEventListener("click", async (e) => {
 });
 $("bg").addEventListener("input", (e) => { S.bg = e.target.value; draw(); writeHash(); });
 $("ink").addEventListener("input", (e) => { S.ink = e.target.value; draw(); writeHash(); });
-$("preset").addEventListener("change", (e) => {
-  const [w, h] = e.target.value.split("x").map(Number);
-  S.w = w; S.h = h;
+// aspect shown as a ratio, so a custom size can be checked at a glance
+function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+function setSize(w, h) {
+  S.w = Math.max(200, Math.min(4000, Math.round(w)));
+  S.h = Math.max(200, Math.min(4000, Math.round(h)));
+  $("pw").value = S.w;
+  $("ph").value = S.h;
+  const g = gcd(S.w, S.h);
+  $("v-ar").textContent = `${S.w / g}:${S.h / g}`;
+  const match = [...$("preset").options].find((o) => o.value === `${S.w}x${S.h}`);
+  $("preset").value = match ? match.value : "custom";
   resize();
   build();
+  writeHash();
+}
+$("preset").addEventListener("change", (e) => {
+  if (e.target.value === "custom") return $("pw").focus();
+  const [w, h] = e.target.value.split("x").map(Number);
+  setSize(w, h);
 });
+// change, not input: a number field fires on every keystroke and a half-typed
+// width would rebuild the whole grid
+for (const id of ["pw", "ph"])
+  $(id).addEventListener("change", () => setSize(+$("pw").value, +$("ph").value));
 $("shuffle").addEventListener("click", () => setSeed((Math.random() * 1e9) | 0));
 $("alphaBtn").addEventListener("click", (e) => {
   S.alpha = e.currentTarget.dataset.on !== "true";
@@ -443,9 +472,7 @@ hashLock = true;
 readHash();
 syncControls();
 hashLock = false;
-resize();
-build();
-writeHash();
+setSize(S.w, S.h); // also resizes, builds and records the aspect
 window.__S = S;
 window.__build = build;
 window.__draw = draw;
