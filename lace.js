@@ -279,6 +279,17 @@ export function drawImageLace(g, w, h, img, o) {
   }
 }
 
+// The field the border encloses — where a picture belongs, rather than running
+// under the frame and off the edge of the panel.
+export function fieldRect(w, h, o) {
+  if (!o.border) return { x: 0, y: 0, w, h };
+  const weight = Math.min(w, h) * 0.006 * o.weight;
+  const inset = Math.min(w, h) * o.inset;
+  const d = inset + (o.bands - 1) * weight * 3.2 + weight * 3.2;
+  const m = Math.min(d, Math.min(w, h) * 0.45); // never close the field entirely
+  return { x: m, y: m, w: w - m * 2, h: h - m * 2 };
+}
+
 // The frame on its own, so a dropped image can take the same border.
 export function drawBorder(g, w, h, o) {
   g.save();

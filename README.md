@@ -109,7 +109,9 @@ woven look: the grid decides what survives, the way a weave does.
   decides what becomes thread — `edges` traces where the picture changes, which
   is what actually reads as lace, while `tone` follows its light and dark and
   stitches bright masses solid. `Image zoom` frames the crop, `Invert` swaps
-  which side of it survives.
+  which side of it survives. The picture is placed inside the field the border
+  encloses, rather than running under the frame and off the panel; with the
+  border off it fills the panel.
 
 ## The ornament
 

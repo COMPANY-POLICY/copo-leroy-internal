@@ -157,7 +157,7 @@
 </div>
 
 <script type="module">
-import { drawLace, drawImageLace, drawBorder, toGrid, drawStitches } from "./lace.js";
+import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches } from "./lace.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -189,13 +189,21 @@ function build() {
 
   const usingImage = S.source !== "motif" && S.image;
   if (usingImage) {
-    if (S.source === "imageLace") drawImageLace(g, src.width, src.height, S.image, S);
+    // the picture sits in the field the border encloses, not under the frame
+    const f = fieldRect(src.width, src.height, S);
+    g.save();
+    g.beginPath();
+    g.rect(f.x, f.y, f.w, f.h);
+    g.clip();
+    g.translate(f.x, f.y);
+    if (S.source === "imageLace") drawImageLace(g, f.w, f.h, S.image, S);
     else {
       const img = S.image;
-      const s = Math.max(src.width / img.width, src.height / img.height);
-      g.drawImage(img, (src.width - img.width * s) / 2, (src.height - img.height * s) / 2,
+      const s = Math.max(f.w / img.width, f.h / img.height);
+      g.drawImage(img, (f.w - img.width * s) / 2, (f.h - img.height * s) / 2,
         img.width * s, img.height * s);
     }
+    g.restore();
     // Coverage from the picture: tone reads its light and dark, edges reads
     // where it changes. A photograph's bright masses stitch solid under tone,
     // so edges is what actually comes back as lace.
