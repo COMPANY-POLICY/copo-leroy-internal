@@ -111,8 +111,13 @@ woven look: the grid decides what survives, the way a weave does.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
-  threshold. `weight` orders that by how solid each part of the pattern already
-  is, so the faint extremities go first and the dense core last; `breathe`
+  threshold — with one exception. `gather` moves the stitches themselves: each
+  one is given somewhere to come in from, out along its own bearing from the
+  middle, and a turn to do it, sooner the closer it lies to the heart of the
+  shape, so the pattern assembles from its core outward and then flies apart
+  again. At rest it is pixel-for-pixel the still composition. The rest move
+  which cells are lit: `weight` orders that by how solid each part of the
+  pattern already is, so the faint extremities go first and the dense core last; `breathe`
   opens and closes as a whole. The dither seed is held still throughout, since a moving
   seed sparkles where a fixed one lets blocks step from cell to cell. `morph` walks a series
   of uploaded images — `Add images…` takes as many as you like, in the order

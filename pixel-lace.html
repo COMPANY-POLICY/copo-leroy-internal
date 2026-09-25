@@ -171,6 +171,7 @@
     <h2>Motion</h2>
     <label><select id="motion">
       <option value="none">still</option>
+      <option value="gather">gather — stitches fly in and settle into the shape</option>
       <option value="weight">weight — the faint parts go first, the dense last</option>
       <option value="breathe">breathe — opens and closes as one</option>
       <option value="morph">morph — one image into the next</option>
@@ -200,7 +201,7 @@
 </div>
 
 <script type="module">
-import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches, toSVG, shapeField } from "./lace.js";
+import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches, drawLoose, stitchCells, toSVG, shapeField } from "./lace.js";
 
 const $ = (id) => document.getElementById(id);
 const download = (href, name) => {
@@ -228,6 +229,7 @@ const S = {
 let grid = null;
 let seqGrids = []; // one grid per uploaded image, rebuilt only when settings change
 let orders = new Map(); // per pair: the order cells change hands in a morph
+let loose = null;       // the stitches as movable things, for the gather
 
 // With no sequence loaded, a morph still has somewhere to go: the next seed.
 function morphTarget() {
@@ -291,6 +293,7 @@ function build() {
   }));
   grid = seqGrids.length ? seqGrids[0] : buildSource();
   orders.clear(); // the morph schedules go with the grids they described
+  loose = null;
   window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const rows = grid.rows;
   const usingImage = S.source !== "motif" && S.image;
@@ -371,6 +374,13 @@ function buildSource(over = {}) {
   return toGrid(src, S.cols, rows);
 }
 
+function drawOpts() {
+  return {
+    w: S.w, h: S.h, levels: S.levels, threshold: S.threshold, contrast: S.contrast,
+    gap: S.gap, shape: S.shape, dither: S.dither, seed: S.seed,
+  };
+}
+
 function draw(frame = null) {
   ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
   ctx.clearRect(0, 0, S.w, S.h);
@@ -380,6 +390,13 @@ function draw(frame = null) {
     ctx.fillRect(0, 0, S.w, S.h);
   }
   if (!grid) return;
+  if (frame?.loose) {
+    drawLoose(ctx, frame.loose.items, {
+      ink: S.ink, shape: S.shape, size: frame.loose.size,
+      levels: frame.loose.levels, phase: frame.phase,
+    });
+    return;
+  }
   drawStitches(ctx, frame?.grid || grid, {
     w: S.w, h: S.h, ink: S.ink, levels: S.levels,
     threshold: frame?.threshold ?? S.threshold,
@@ -395,6 +412,41 @@ let anim = { on: false, raf: 0, beat: 0, last: 0, tick: 0, morphB: null };
 
 function morphGrid(t) {
   return crossfade(grid, anim.morphB, t, "seed");
+}
+
+// The stitches of the still composition, each given somewhere to come in from
+// and a turn to do it: out along its own bearing from the middle, and sooner
+// the closer it lies to the heart of the shape, so the pattern assembles from
+// its core outward rather than arriving all at once.
+function looseStitches() {
+  const key = [S.cols, S.levels, S.gap, S.shape, S.threshold, S.contrast, S.dither, S.seed,
+    S.w, S.h].join("|");
+  if (loose && loose.key === key) return loose;
+  const { byLevel, size, levels } = stitchCells(grid, drawOpts());
+  const fld = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
+  const cw = S.w / grid.cols, ch = S.h / grid.rows;
+  const cx = S.w / 2, cy = S.h / 2;
+  const half = Math.hypot(S.w, S.h) / 2;
+  const rnd = (() => { let a = 0x2f6e2b1 ^ S.seed; return () => (a = (a * 1664525 + 1013904223) >>> 0) / 4294967296; })();
+  const items = [];
+  for (let l = 1; l <= levels; l++) {
+    for (const [tx, ty] of byLevel[l]) {
+      const rx = Math.min(grid.cols - 1, Math.max(0, Math.floor(tx / cw)));
+      const ry = Math.min(grid.rows - 1, Math.max(0, Math.floor(ty / ch)));
+      const a = Math.atan2(ty - cy, tx - cx) + (rnd() - 0.5) * 1.1;
+      const d = half * (0.45 + rnd() * 1.1);
+      items.push({
+        tx, ty, level: l,
+        sx: cx + Math.cos(a) * d,
+        sy: cy + Math.sin(a) * d,
+        delay: Math.min(1, fld[ry * grid.cols + rx] * 0.7 + rnd() * 0.45),
+        x: tx, y: ty, a: 1,
+      });
+    }
+  }
+  loose = { key, items, size, levels };
+  window.__loose = loose; // dev hook
+  return loose;
 }
 
 // A travelling field added to the coverage, so different parts of the pattern
@@ -418,6 +470,18 @@ function frameAt(n) {
   switch (S.motion) {
     case "breathe":
       return waveFrame(t, (cov, t) => Math.sin(t * 2.2) * amt * 0.22);
+    case "gather": {
+      const g = looseStitches();
+      const travel = 1.7, hold = 0.4 + amt * 3;
+      const cycle = travel * 2 + hold * 2;
+      const p = ((t % cycle) + cycle) % cycle;
+      let phase;
+      if (p < travel) phase = p / travel;                       // coming together
+      else if (p < travel + hold) phase = 1;                    // formed
+      else if (p < travel * 2 + hold) phase = 1 - (p - travel - hold) / travel; // apart
+      else phase = 0;
+      return { loose: g, phase };
+    }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
     case "morph": {

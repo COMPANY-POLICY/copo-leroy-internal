@@ -550,6 +550,54 @@ export function drawStitches(ctx, grid, o) {
   ctx.globalAlpha = 1;
 }
 
+// Every other mode moves which cells are lit; this one moves the stitches
+// themselves. Each carries where it ends up, where it came in from and when its
+// turn is, and is drawn somewhere along that line — so they arrive rather than
+// appear, and at phase 1 they sit exactly where the still composition puts them.
+export function drawLoose(ctx, items, o) {
+  const { ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0.55 } = o;
+  const buckets = Array.from({ length: levels + 1 }, () => []);
+  const span = 1 - stagger;
+  for (const it of items) {
+    const u = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
+    if (u <= 0) continue;
+    const e = 1 - Math.pow(1 - u, 3); // eases in fast, settles slowly
+    it.x = it.sx + (it.tx - it.sx) * e;
+    it.y = it.sy + (it.ty - it.sy) * e;
+    it.a = u;
+    buckets[it.level].push(it);
+  }
+  ctx.fillStyle = ink;
+  const r = size / 2;
+  const QUARTER = (a) => Math.min(3, Math.floor(a * 4)); // 1 lands in the last one
+  for (let l = 1; l <= levels; l++) {
+    const bucket = buckets[l];
+    if (!bucket.length) continue;
+    // alpha is per stitch here, so they are grouped by how far along they are
+    for (let q = 0; q < 4; q++) {
+      let any = false;
+      ctx.beginPath();
+      for (const it of bucket) {
+        if (QUARTER(it.a) !== q) continue;
+        any = true;
+        if (shape === "dot") {
+          ctx.moveTo(it.x + size, it.y + r);
+          ctx.arc(it.x + r, it.y + r, r, 0, Math.PI * 2);
+        } else if (shape === "cross") {
+          const t = size * 0.34;
+          ctx.rect(it.x, it.y + (size - t) / 2, size, t);
+          ctx.rect(it.x + (size - t) / 2, it.y, t, size);
+        } else ctx.rect(it.x, it.y, size, size);
+      }
+      if (!any) continue;
+      // the last quarter is full strength, so a settled gather matches the still
+      ctx.globalAlpha = (l / levels) * ((q + 1) / 4);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
 // The same stitches as vector, flattened: every stitch in one compound path on
 // a transparent ground, so the file arrives as a single object to place,
 // recolour or cut. Tone cannot survive that — one path carries one fill — so
