@@ -83,7 +83,7 @@
 
     <h2>Grid</h2>
     <label><span>Columns <b id="v-cols"></b></span>
-      <input id="cols" type="range" min="24" max="220" step="2" value="120" /></label>
+      <input id="cols" type="range" min="24" max="400" step="2" value="120" /></label>
     <label><span>Gap <b id="v-gap"></b></span>
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
     <label><span>Levels <b id="v-levels"></b></span>
@@ -113,6 +113,7 @@
     <div class="row"><button id="shuffle">Shuffle</button><button id="copyLink">Copy link</button></div>
     <label style="margin-top:8px"><span>Symmetry</span><select id="symmetry">
       <option value="mirror4">mirrored — both axes</option>
+      <option value="none">none — a single spray</option>
       <option value="mirrorX">mirrored — one axis</option>
       <option value="rot4">turned — four-fold</option>
       <option value="kaleido8">kaleidoscope — eight</option>
@@ -191,7 +192,9 @@ let grid = null;
 function build() {
   const rows = Math.max(4, Math.round((S.cols * S.h) / S.w));
   // render the motif far above grid resolution, so each cell has real coverage
-  const RES = Math.max(1200, S.cols * 10);
+  // ten render pixels per cell gives each one real coverage to average, but it
+  // is capped — past this the buffer costs more than the extra detail is worth
+  const RES = Math.min(3400, Math.max(1200, S.cols * 10));
   src.width = RES;
   src.height = Math.round((RES * S.h) / S.w);
   const g = src.getContext("2d", { willReadFrequently: true });

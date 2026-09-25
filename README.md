@@ -91,13 +91,16 @@ woven look: the grid decides what survives, the way a weave does.
 - **Seed** — typed in, stepped one at a time with `◀ ▶`, or thrown by
   `Shuffle`. Every control lives in the URL, so `Copy link` hands over an exact
   pattern and reopening a link restores it.
-- **Symmetry** — mirrored on both axes (the damask panel), mirrored on one axis
+- **Symmetry** — none (a single free-standing spray, no repetition at all),
+  mirrored on both axes (the damask panel), mirrored on one axis
   (the halves then differ top to bottom), turned four-fold (a pinwheel),
   kaleidoscope of eight (a doily), or a half-drop repeat (wallpaper rather than
   a panel). The two radial modes work off the shorter side, so they suit a
   square panel best.
-- **Grid** — columns, gap, stitch shape (square, round, cross), how many tonal
-  levels, and dither, which breaks flat areas into stitches instead of slabs.
+- **Grid** — columns (up to 400 — past about 200 the damask stops reading as
+  pixels and starts reading as embroidery), gap, stitch shape (square, round,
+  cross), how many tonal levels, and dither, which breaks flat areas into
+  stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
 - **Border** — bands and corner scrolls. The motif is composed into the field
   the border encloses and clipped to it, so the frame reads as a frame; widen

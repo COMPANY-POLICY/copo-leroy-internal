@@ -63,7 +63,7 @@ function sprig(g, w, h, o, seed, from = 0.12, to = 1.42) {
   const diag = Math.hypot(w, h);
   const span = to - from;
   // a wide fan has to reach less far, or it runs off its own box
-  const reach = span > 1.6 ? 0.78 : 1;
+  const reach = span > 4 ? 0.62 : span > 1.6 ? 0.78 : 1;
   for (let s = 0; s < stems; s++) {
     const a0 = from + ((s + 0.5) / stems) * span + (r() - 0.5) * (span / stems) * 0.5;
     // stems start away from the middle, or the centre clogs and the field
@@ -152,6 +152,9 @@ function motif(g, w, h, qo, seed, o) {
   const at = (fn) => { g.save(); g.translate(cx, cy); fn(); g.restore(); };
 
   switch (o.symmetry || "mirror4") {
+    case "none": // no repetition at all — one free-standing spray
+      at(() => sprig(g, w / 2, h / 2, qo, seed, -Math.PI, Math.PI));
+      break;
     case "mirrorX": // one axis only — the halves differ top to bottom
       for (const sx of [1, -1])
         at(() => { g.scale(sx, 1); sprig(g, w / 2, h / 2, qo, seed, -1.35, 1.35); });
@@ -253,6 +256,9 @@ export function drawImageLace(g, w, h, img, o) {
   };
 
   switch (o.symmetry || "mirror4") {
+    case "none": // placed as it is, once
+      at(() => cover(g, img, -w / 2, -h / 2, w, h, z));
+      break;
     case "mirrorX":
       for (const sx of [1, -1])
         at(() => { g.scale(sx, 1); cover(g, img, 0, -h / 2, w / 2, h, z); });
