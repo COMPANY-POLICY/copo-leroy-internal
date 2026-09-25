@@ -441,7 +441,6 @@ $("saveSvg").addEventListener("click", () => {
   const svg = toSVG(grid, {
     w: S.w, h: S.h, ink: S.ink, levels: S.levels, threshold: S.threshold,
     contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither, seed: S.seed,
-    bg: S.alpha ? null : S.bg,
   });
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   download(url, `pixel-lace-${S.w}x${S.h}.svg`);

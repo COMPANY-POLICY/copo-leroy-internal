@@ -466,35 +466,34 @@ export function drawStitches(ctx, grid, o) {
   ctx.globalAlpha = 1;
 }
 
-// The same stitches as vector: one path per tonal level, which keeps the file
-// small and leaves it editable as a handful of objects rather than thousands.
+// The same stitches as vector, flattened: every stitch in one compound path on
+// a transparent ground, so the file arrives as a single object to place,
+// recolour or cut. Tone cannot survive that — one path carries one fill — so
+// the levels collapse to solid. Set Levels to 1 and the canvas shows exactly
+// what the file will be.
 export function toSVG(grid, o) {
-  const { ink = "#2fe36a", shape = "square", w, h, bg = null } = o;
+  const { ink = "#2fe36a", shape = "square", w, h } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   const n = (v) => Math.round(v * 100) / 100;
-  const r = n(size / 2);
-  const out = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">`,
-  ];
-  if (bg) out.push(`<rect width="${n(w)}" height="${n(h)}" fill="${bg}"/>`);
+  const r = n(size / 2), sz = n(size);
+  const d = [];
   for (let l = 1; l <= levels; l++) {
-    const cellsAt = byLevel[l];
-    if (!cellsAt.length) continue;
-    const d = [];
-    for (const [px, py] of cellsAt) {
-      const x = n(px), y = n(py), s = n(size);
+    for (const [px, py] of byLevel[l]) {
+      const x = n(px), y = n(py);
       if (shape === "dot") {
-        d.push(`M${n(x)} ${n(y + r)}a${r} ${r} 0 1 0 ${n(size)} 0a${r} ${r} 0 1 0 ${n(-size)} 0z`);
+        d.push(`M${x} ${n(y + r)}a${r} ${r} 0 1 0 ${sz} 0a${r} ${r} 0 1 0 ${n(-size)} 0z`);
       } else if (shape === "cross") {
         const t = n(size * 0.34), off = n((size - size * 0.34) / 2);
-        d.push(`M${x} ${n(y + off)}h${s}v${t}h${-s}z`);
-        d.push(`M${n(x + off)} ${y}h${t}v${s}h${-t}z`);
+        d.push(`M${x} ${n(y + off)}h${sz}v${t}h${n(-size)}z`);
+        d.push(`M${n(x + off)} ${y}h${t}v${sz}h${-t}z`);
       } else {
-        d.push(`M${x} ${y}h${s}v${s}h${-s}z`);
+        d.push(`M${x} ${y}h${sz}v${sz}h${n(-size)}z`);
       }
     }
-    out.push(`<path fill="${ink}" fill-opacity="${n(l / levels)}" d="${d.join("")}"/>`);
   }
-  out.push("</svg>");
-  return out.join("\n");
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">`,
+    `<path fill="${ink}" d="${d.join("")}"/>`,
+    "</svg>",
+  ].join("\n");
 }

@@ -108,9 +108,11 @@ woven look: the grid decides what survives, the way a weave does.
   the border encloses and clipped to it, so the frame reads as a frame; widen
   the border and the pattern tightens with it. A dropped image is placed in that
   same field.
-- **Save PNG / Save SVG** — the SVG is the same stitches as vector, one path
-  per tonal level, so the file stays small and opens as a handful of objects
-  rather than thousands. Transparent ground carries over to it.
+- **Save PNG / Save SVG** — the SVG is the same stitches as vector, flattened:
+  every stitch in one compound path on a transparent ground, so the file
+  arrives as a single object to place, recolour or cut. Tone cannot survive
+  that — one path carries one fill — so the levels collapse to solid. Set
+  `Levels` to 1 and the canvas shows exactly what the file will be.
 - **Transparent ground** — drops the panel colour so the PNG exports as the
   lace alone, to lay over a photograph or a product shot. The lower tonal
   levels stay semi-transparent, which is what you want over a busy ground.
