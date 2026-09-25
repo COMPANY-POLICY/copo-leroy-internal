@@ -111,11 +111,15 @@ woven look: the grid decides what survives, the way a weave does.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
-  threshold — with one exception. `gather` moves the stitches themselves: each
-  one is given somewhere to come in from, out along its own bearing from the
-  middle, and a turn to do it, sooner the closer it lies to the heart of the
-  shape, so the pattern assembles from its core outward and then flies apart
-  again. At rest it is pixel-for-pixel the still composition. The rest move
+  threshold — with one exception. `gather` moves the stitches themselves. They
+  wait in an even grid across the panel and are then arranged into the pattern,
+  sooner the closer each lies to the heart of the shape, so it assembles from
+  its core outward and then goes back to the grid. Each is paired to its slot
+  spoke by spoke — both sets ordered the same way around the middle — so they
+  travel more or less radially rather than crossing over each other, and every
+  one is drawn at full strength wherever it is: they are the same stitches
+  throughout, waiting to be arranged, not arriving out of nothing. At rest it
+  is pixel-for-pixel the still composition. The rest move
   which cells are lit: `weight` orders that by how solid each part of the
   pattern already is, so the faint extremities go first and the dense core last; `breathe`
   opens and closes as a whole. The dither seed is held still throughout, since a moving

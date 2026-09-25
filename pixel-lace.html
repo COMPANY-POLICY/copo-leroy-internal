@@ -426,24 +426,55 @@ function looseStitches() {
   const fld = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
   const cw = S.w / grid.cols, ch = S.h / grid.rows;
   const cx = S.w / 2, cy = S.h / 2;
-  const half = Math.hypot(S.w, S.h) / 2;
-  const rnd = (() => { let a = 0x2f6e2b1 ^ S.seed; return () => (a = (a * 1664525 + 1013904223) >>> 0) / 4294967296; })();
+
   const items = [];
   for (let l = 1; l <= levels; l++) {
     for (const [tx, ty] of byLevel[l]) {
       const rx = Math.min(grid.cols - 1, Math.max(0, Math.floor(tx / cw)));
       const ry = Math.min(grid.rows - 1, Math.max(0, Math.floor(ty / ch)));
-      const a = Math.atan2(ty - cy, tx - cx) + (rnd() - 0.5) * 1.1;
-      const d = half * (0.45 + rnd() * 1.1);
       items.push({
         tx, ty, level: l,
-        sx: cx + Math.cos(a) * d,
-        sy: cy + Math.sin(a) * d,
-        delay: Math.min(1, fld[ry * grid.cols + rx] * 0.7 + rnd() * 0.45),
+        sx: tx, sy: ty,
+        delay: Math.min(1, fld[ry * grid.cols + rx] * 0.8 + 0.1),
         x: tx, y: ty, a: 1,
       });
     }
   }
+
+  // The dispersed state is a plain grid across the panel, evenly spaced, with
+  // the short last row centred — scattering them at random read as noise rather
+  // than as the same stitches waiting to be arranged.
+  const n = items.length;
+  const gc = Math.max(1, Math.round(Math.sqrt(n * (S.w / S.h))));
+  const gr = Math.max(1, Math.ceil(n / gc));
+  const stepX = S.w / gc, stepY = S.h / gr;
+  const slots = [];
+  for (let r = 0; r < gr; r++) {
+    const inRow = Math.min(gc, n - r * gc);
+    if (inRow <= 0) break;
+    const pad = (gc - inRow) / 2; // centre a short final row
+    for (let c = 0; c < inRow; c++) {
+      slots.push([(c + pad + 0.5) * stepX - size / 2, (r + 0.5) * stepY - size / 2]);
+    }
+  }
+
+  // Pair them spoke by spoke — both lists in the same order round the middle —
+  // so the stitches travel more or less radially instead of crossing over each
+  // other on the way in.
+  const spoke = ([x, y]) => {
+    const a = Math.atan2(y + size / 2 - cy, x + size / 2 - cx);
+    const bucket = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 64);
+    return bucket * 1e6 + Math.hypot(x - cx, y - cy);
+  };
+  const order = items.map((it, i) => i)
+    .sort((a, b) => spoke([items[a].tx, items[a].ty]) - spoke([items[b].tx, items[b].ty]));
+  slots.sort((a, b) => spoke(a) - spoke(b));
+  order.forEach((idx, k) => {
+    const slot = slots[k] || slots[slots.length - 1];
+    items[idx].sx = slot[0];
+    items[idx].sy = slot[1];
+  });
+
   loose = { key, items, size, levels };
   window.__loose = loose; // dev hook
   return loose;
