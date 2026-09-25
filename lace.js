@@ -222,8 +222,26 @@ export function drawLace(g, w, h, o) {
   g.beginPath();
   g.rect(f.x, f.y, f.w, f.h);
   g.clip();
-  g.translate(f.x, f.y);
-  motif(g, f.w, f.h, qo, seed, o);
+  if ((o.symmetry || "mirror4") === "none") {
+    // Nothing balances a single spray, so it lands wherever its stems happen to
+    // fan. Draw it aside, find what it actually covers, and centre that.
+    const t = document.createElement("canvas");
+    t.width = Math.max(1, Math.round(f.w));
+    t.height = Math.max(1, Math.round(f.h));
+    const tg = t.getContext("2d", { willReadFrequently: true });
+    tg.fillStyle = "#fff";
+    tg.strokeStyle = "#fff";
+    tg.lineCap = "round";
+    tg.lineJoin = "round";
+    motif(tg, t.width, t.height, qo, seed, o);
+    const b = inkBounds(tg, t.width, t.height);
+    const dx = b ? (t.width - (b.x1 - b.x0)) / 2 - b.x0 : 0;
+    const dy = b ? (t.height - (b.y1 - b.y0)) / 2 - b.y0 : 0;
+    g.drawImage(t, f.x + dx, f.y + dy);
+  } else {
+    g.translate(f.x, f.y);
+    motif(g, f.w, f.h, qo, seed, o);
+  }
   g.restore();
 
   if (o.border) {
@@ -236,6 +254,13 @@ export function drawLace(g, w, h, o) {
 // An uploaded image put through the same symmetry group as the motif, so a
 // photograph comes back as lace rather than as a pixelated photograph. Its
 // luminance becomes coverage later, in the page.
+// the whole picture, centred, with ground around it — nothing cropped away
+function contain(g, img, x, y, w, h, zoom = 1) {
+  const s = Math.min(w / img.width, h / img.height) * zoom;
+  const iw = img.width * s, ih = img.height * s;
+  g.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+}
+
 function cover(g, img, x, y, w, h, zoom = 1) {
   const s = Math.max(w / img.width, h / img.height) * zoom;
   const iw = img.width * s, ih = img.height * s;
@@ -256,8 +281,8 @@ export function drawImageLace(g, w, h, img, o) {
   };
 
   switch (o.symmetry || "mirror4") {
-    case "none": // placed as it is, once
-      at(() => cover(g, img, -w / 2, -h / 2, w, h, z));
+    case "none": // placed once, whole, in the middle
+      at(() => contain(g, img, -w / 2, -h / 2, w, h, z));
       break;
     case "mirrorX":
       for (const sx of [1, -1])
@@ -300,6 +325,23 @@ export function drawImageLace(g, w, h, img, o) {
       for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]])
         at(() => { g.scale(sx, sy); cover(g, img, 0, 0, w / 2, h / 2, z); });
   }
+}
+
+// What a drawing actually covers, sampled every few pixels — exact enough to
+// centre by, and far cheaper than reading every one.
+function inkBounds(g, w, h, step = 3) {
+  const d = g.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      if (d[(y * w + x) * 4 + 3] < 8) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
 }
 
 // The field the border encloses — where a picture belongs, rather than running

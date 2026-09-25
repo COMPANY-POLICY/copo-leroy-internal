@@ -91,7 +91,9 @@ woven look: the grid decides what survives, the way a weave does.
 - **Seed** — typed in, stepped one at a time with `◀ ▶`, or thrown by
   `Shuffle`. Every control lives in the URL, so `Copy link` hands over an exact
   pattern and reopening a link restores it.
-- **Symmetry** — none (a single free-standing spray, no repetition at all),
+- **Symmetry** — none (a single free-standing spray, centred on its own ink,
+  since nothing else balances it — and an image under none is placed whole and
+  centred rather than cropped to fill),
   mirrored on both axes (the damask panel), mirrored on one axis
   (the halves then differ top to bottom), turned four-fold (a pinwheel),
   kaleidoscope of eight (a doily), or a half-drop repeat (wallpaper rather than
