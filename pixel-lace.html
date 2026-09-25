@@ -37,8 +37,12 @@
       border-radius: 6px; background: #0a0d0e; color: var(--txt); font: inherit; }
     input[type=number] { box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--line);
       border-radius: 6px; background: #0a0d0e; color: var(--txt); font: inherit; }
-    input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid var(--line);
-      border-radius: 6px; background: #0a0d0e; }
+    .swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .swatches button { padding: 0; height: 20px; border-radius: 3px; border: 1px solid #ffffff22;
+      cursor: pointer; }
+    .swatches button:hover { border-color: #ffffff88; }
+    .swatches button[data-on="true"] { outline: 2px solid var(--hi); outline-offset: 1px;
+      border-color: transparent; }
     .row { display: flex; gap: 6px; }
     .row > * { flex: 1; }
     button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
@@ -81,10 +85,8 @@
       <label><span>Height</span>
         <input type="number" id="ph" min="200" max="4000" step="10" value="1000" /></label>
     </div>
-    <div class="row">
-      <label><span>Ground</span><input type="color" id="bg" value="#fbf4dd" /></label>
-      <label><span>Thread</span><input type="color" id="ink" value="#86842d" /></label>
-    </div>
+    <label><span>Ground <b id="v-bg"></b></span><div class="swatches" id="bgSw"></div></label>
+    <label><span>Thread <b id="v-ink"></b></span><div class="swatches" id="inkSw"></div></label>
     <button id="alphaBtn" style="width:100%">Transparent ground</button>
 
     <h2>Grid</h2>
@@ -214,6 +216,11 @@
 import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches, drawLoose, stitchCells, toSVG, shapeField } from "./lace.js";
 
 const $ = (id) => document.getElementById(id);
+
+// The working palette, off the studio sheet, with a grey ramp under it. Fixed
+// swatches rather than a colour picker: these are the colours the work is in.
+const PALETTE = ["#fbf4dd", "#fff278", "#86842d", "#403b12", "#2a2a2a", "#181818", "#ffffff"];
+const GREYS = ["#e8e8e8", "#c4c4c4", "#9a9a9a", "#6e6e6e", "#484848", "#242424", "#000000"];
 const download = (href, name) => {
   const a = document.createElement("a");
   a.download = name;
@@ -717,8 +724,7 @@ function syncControls() {
   $("transition").value = S.transition;
   amountLabel();
   $("shape").value = S.shape;
-  $("bg").value = S.bg;
-  $("ink").value = S.ink;
+  markSwatches();
   $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
   for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
     ["alphaBtn", "alpha"], ["invert", "invert"]]) $(id).dataset.on = String(S[key]);
@@ -945,8 +951,33 @@ $("copyLink").addEventListener("click", async (e) => {
     setTimeout(() => (b.textContent = t), 1200);
   } catch { /* clipboard blocked — the URL bar has it either way */ }
 });
-$("bg").addEventListener("input", (e) => { S.bg = e.target.value; draw(); writeHash(); });
-$("ink").addEventListener("input", (e) => { S.ink = e.target.value; draw(); writeHash(); });
+function buildSwatches(hostId, key) {
+  const host = $(hostId);
+  host.innerHTML = "";
+  for (const hex of [...PALETTE, ...GREYS]) {
+    const b = document.createElement("button");
+    b.style.background = hex;
+    b.title = hex.toUpperCase();
+    b.dataset.hex = hex;
+    b.addEventListener("click", () => {
+      S[key] = hex;
+      markSwatches();
+      draw();
+      writeHash();
+    });
+    host.appendChild(b);
+  }
+}
+function markSwatches() {
+  for (const [hostId, key] of [["bgSw", "bg"], ["inkSw", "ink"]]) {
+    const cur = String(S[key]).toLowerCase();
+    for (const b of $(hostId).children) b.dataset.on = String(b.dataset.hex === cur);
+    const out = $("v-" + key);
+    if (out) out.textContent = cur.toUpperCase();
+  }
+}
+buildSwatches("bgSw", "bg");
+buildSwatches("inkSw", "ink");
 // aspect shown as a ratio, so a custom size can be checked at a glance
 function gcd(a, b) { return b ? gcd(b, a % b) : a; }
 function setSize(w, h) {

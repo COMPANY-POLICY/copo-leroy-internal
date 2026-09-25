@@ -67,6 +67,9 @@ font on the machine works with no font library and nothing fetched.
   `Solid type` renders the rings as clean type instead, for the fine-print look.
 - **Ground** — a colour, or drop an image anywhere on the window to set it as
   the background, with a dim slider to hold the type off a busy photo.
+  (`pixel-lace` uses fixed swatches for ground and thread instead: the working
+  palette off the studio sheet — cream, yellow, olive, dark olive, charcoal,
+  near-black, white — with a grey ramp under it.)
 - **Assemble** replays the dots flying in and settling. `Save PNG` exports at
   the canvas's full pixel size.
 
