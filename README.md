@@ -117,15 +117,16 @@ woven look: the grid decides what survives, the way a weave does.
   to the grid again. Every stitch moves together, one step per frame, so each
   frame is the whole set a step closer rather than a scatter of arrival times,
   and `Frames per second` only decides how long each step is held. The steps
-  are spaced so it closes in quickly and then refines: spaced evenly, every
-  frame looks equally unformed and the pattern only resolves in the last one or
-  two. Every frame is a legal
+  are evenly spaced: the pairing keeps the trips short, roughly a cell per
+  step, so each frame lands somewhere new on the lattice. Every frame is a legal
   arrangement on the same lattice the stitches end on, so blocks step from cell
   to cell rather than sliding between them — off-lattice positions are what
   made it read as things flying about instead of as a pattern rearranging
-  itself. Each stitch is paired to its slot
-  spoke by spoke — both sets ordered the same way around the middle — so they
-  travel more or less radially rather than crossing over each other, and every
+  itself. Each stitch is paired to its slot along a
+  Hilbert curve, which runs through two dimensions without favouring a
+  direction, so neighbouring slots feed neighbouring targets and the set
+  contracts evenly — ordering both by angle instead put a systematic twist
+  between them and the whole thing wound in like a spiral. Every
   one is drawn at full strength wherever it is: they are the same stitches
   throughout, waiting to be arranged, not arriving out of nothing. At rest it
   is pixel-for-pixel the still composition. The rest move

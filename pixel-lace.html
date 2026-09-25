@@ -462,17 +462,31 @@ function looseStitches() {
     }
   }
 
-  // Pair them spoke by spoke — both lists in the same order round the middle —
-  // so the stitches travel more or less radially instead of crossing over each
-  // other on the way in.
-  const spoke = ([x, y]) => {
-    const a = Math.atan2(y + size / 2 - cy, x + size / 2 - cx);
-    const bucket = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 64);
-    return bucket * 1e6 + Math.hypot(x - cx, y - cy);
+  // Pair them along a Hilbert curve: it runs through two dimensions without
+  // ever favouring a direction, so neighbouring slots feed neighbouring
+  // targets and the set contracts evenly. Ordering both lists by angle instead
+  // put a systematic twist between them — every stitch handed to a slot a
+  // little further round than the last — and the whole thing wound in like a
+  // spiral.
+  const ORDER = 8, SIDE = 1 << ORDER;
+  const hilbert = (px, py) => {
+    let x = Math.max(0, Math.min(SIDE - 1, Math.floor((px / S.w) * SIDE)));
+    let y = Math.max(0, Math.min(SIDE - 1, Math.floor((py / S.h) * SIDE)));
+    let d = 0;
+    for (let sN = SIDE / 2; sN > 0; sN /= 2) {
+      const rx = (x & sN) > 0 ? 1 : 0;
+      const ry = (y & sN) > 0 ? 1 : 0;
+      d += sN * sN * ((3 * rx) ^ ry);
+      if (ry === 0) {
+        if (rx === 1) { x = sN - 1 - x; y = sN - 1 - y; }
+        const t = x; x = y; y = t;
+      }
+    }
+    return d;
   };
   const order = items.map((it, i) => i)
-    .sort((a, b) => spoke([items[a].tx, items[a].ty]) - spoke([items[b].tx, items[b].ty]));
-  slots.sort((a, b) => spoke(a) - spoke(b));
+    .sort((a, b) => hilbert(items[a].tx, items[a].ty) - hilbert(items[b].tx, items[b].ty));
+  slots.sort((a, b) => hilbert(a[0], a[1]) - hilbert(b[0], b[1]));
   order.forEach((idx, k) => {
     const slot = slots[k] || slots[slots.length - 1];
     items[idx].sx = slot[0];
@@ -520,11 +534,11 @@ function frameAt(n) {
       else if (k < steps + hold) step = steps;                   // arranged
       else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // opening out
       else step = 0;                                             // back in the grid
-      // Spaced so it closes in quickly and then refines: at even spacing every
-      // frame looks equally unformed and the pattern only resolves in the last
-      // one or two. The steps stay discrete either way.
-      const u = step / steps;
-      return { loose: g, phase: 1 - Math.pow(1 - u, 2.2) };
+      // Evenly spaced. Pairing each stitch to a nearby slot keeps the trips
+      // short — roughly a cell per step — so every frame lands somewhere new on
+      // the lattice. Easing them made the last steps move less than half a cell,
+      // which snapped to the same arrangement twice over.
+      return { loose: g, phase: step / steps };
     }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
