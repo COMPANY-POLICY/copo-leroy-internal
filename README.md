@@ -21,11 +21,6 @@ Then open <http://127.0.0.1:5188/>. The demo page mounts the engine full-bleed
 with a control panel; `Auto` drives it along a self-crossing demo path so it
 shows what it does with no input.
 
-`border.html` is the other end of it: an 18 × 24 poster whose Art Nouveau frame
-is drawn entirely in dust. The chain traces the ornament instead of following
-the cursor, nothing fades, and the cursor is left free to smudge the ink — drag
-through the frame and the dust scatters, then re-condenses on its nodes.
-
 ## How it behaves
 
 - **Chain** — the smoothed pointer path. It is the skeleton the dust clings to,
@@ -123,25 +118,6 @@ woven look: the grid decides what survives, the way a weave does.
   which side of it survives. The picture is placed inside the field the border
   encloses, rather than running under the frame and off the panel; with the
   border off it fills the panel.
-
-## The ornament
-
-`ornament.js` builds the frame as strokes for the engine to trace. Each ribbon
-is a rounded rectangle pushed in and out along its own normal by a cosine — an
-even lobe count keeps it symmetric about both axes — and two ribbons in counter
-phase weave through each other. Every place they cross is a place the engine
-beads up on its own, which is where this kind of ornament wants its nodes
-anyway, so the frame's joints are emergent rather than drawn in.
-
-```js
-import { artNouveauFrame, strokeDriver } from "./ornament.js";
-const driver = strokeDriver(artNouveauFrame(1350, 1800, { lobes: 8 }), 6);
-```
-
-`border.html` takes `?lobes=`, `?speed=`, `?ink=`, and `?scale=` (the pixel
-ratio — the default of 2 gives a 2700 × 3600 canvas, about 150 dpi at 18 × 24;
-`?scale=1` is a lighter preview). `Save PNG` bakes the ground in and exports at
-that resolution.
 
 ## Use it
 
