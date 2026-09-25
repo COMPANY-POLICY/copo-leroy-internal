@@ -254,11 +254,14 @@ export function drawLace(g, w, h, o) {
 // An uploaded image put through the same symmetry group as the motif, so a
 // photograph comes back as lace rather than as a pixelated photograph. Its
 // luminance becomes coverage later, in the page.
-// the whole picture, centred, with ground around it — nothing cropped away
-function contain(g, img, x, y, w, h, zoom = 1) {
+// The whole picture, with ground around it — nothing cropped away. `anchor` is
+// the point of the picture to put in the middle, in its own 0..1 coordinates;
+// the default centres the frame, a measured one centres the subject.
+function contain(g, img, x, y, w, h, zoom = 1, anchor) {
   const s = Math.min(w / img.width, h / img.height) * zoom;
   const iw = img.width * s, ih = img.height * s;
-  g.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+  const ax = anchor ? anchor[0] : 0.5, ay = anchor ? anchor[1] : 0.5;
+  g.drawImage(img, x + w / 2 - iw * ax, y + h / 2 - ih * ay, iw, ih);
 }
 
 function cover(g, img, x, y, w, h, zoom = 1) {
@@ -282,7 +285,7 @@ export function drawImageLace(g, w, h, img, o) {
 
   switch (o.symmetry || "mirror4") {
     case "none": // placed once, whole, in the middle
-      at(() => contain(g, img, -w / 2, -h / 2, w, h, z));
+      at(() => contain(g, img, -w / 2, -h / 2, w, h, z, o.anchor));
       break;
     case "mirrorX":
       for (const sx of [1, -1])

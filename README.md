@@ -126,7 +126,12 @@ woven look: the grid decides what survives, the way a weave does.
   of uploaded images — `Add images…` takes as many as you like, in the order
   picked — dissolving each into the next and looping. Each of those is placed
   on its own, centred and whole, with no mirroring or repetition: it is a
-  series of pictures, not a pattern. With no images loaded it dissolves one
+  series of pictures, not a pattern. Uploads arrive at every size and crop, so
+  each is measured on the way in — the ground is read from its corners, the
+  subject is whatever differs from it, and the zoom and anchor that put that
+  subject in the frame follow from its bounds, which is what stops a series
+  jumping in scale from image to image. Every image then keeps its own zoom
+  slider, and `Fit each` measures them all again. With no images loaded it dissolves one
   seed into the next instead. `Amount` is the hold in seconds there, and the
   depth of the wave elsewhere. Each frame
   is held rather than tweened — it is stop motion, and `Frames per second` sets
