@@ -112,9 +112,14 @@ woven look: the grid decides what survives, the way a weave does.
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
   threshold — with one exception. `gather` moves the stitches themselves. They
-  wait in an even grid across the panel and are then arranged into the pattern,
-  sooner the closer each lies to the heart of the shape, so it assembles from
-  its core outward and then goes back to the grid. Each is paired to its slot
+  wait in an even grid across the panel and are then arranged into the pattern
+  over a counted number of frames — `Steps`, fifteen by default — and back out
+  to the grid again. Every stitch moves together, one step per frame, so each
+  frame is the whole set a step closer rather than a scatter of arrival times,
+  and `Frames per second` only decides how long each step is held. The steps
+  are spaced so it closes in quickly and then refines: spaced evenly, every
+  frame looks equally unformed and the pattern only resolves in the last one or
+  two. Each stitch is paired to its slot
   spoke by spoke — both sets ordered the same way around the middle — so they
   travel more or less radially rather than crossing over each other, and every
   one is drawn at full strength wherever it is: they are the same stitches
