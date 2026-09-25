@@ -119,7 +119,11 @@ woven look: the grid decides what survives, the way a weave does.
   and `Frames per second` only decides how long each step is held. The steps
   are spaced so it closes in quickly and then refines: spaced evenly, every
   frame looks equally unformed and the pattern only resolves in the last one or
-  two. Each stitch is paired to its slot
+  two. Every frame is a legal
+  arrangement on the same lattice the stitches end on, so blocks step from cell
+  to cell rather than sliding between them — off-lattice positions are what
+  made it read as things flying about instead of as a pattern rearranging
+  itself. Each stitch is paired to its slot
   spoke by spoke — both sets ordered the same way around the middle — so they
   travel more or less radially rather than crossing over each other, and every
   one is drawn at full strength wherever it is: they are the same stitches

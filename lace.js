@@ -555,15 +555,29 @@ export function drawStitches(ctx, grid, o) {
 // turn is, and is drawn somewhere along that line — so they arrive rather than
 // appear, and at phase 1 they sit exactly where the still composition puts them.
 export function drawLoose(ctx, items, o) {
-  const { ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0 } = o;
+  const {
+    ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0,
+    cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
+  } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
+  const snap = cw > 0 && ch > 0;
   for (const it of items) {
     // linear, and by default everything moves together: the point is that each
     // frame is the whole set a step closer, not a scatter of arrival times
     const e = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
-    it.x = it.sx + (it.tx - it.sx) * e;
-    it.y = it.sy + (it.ty - it.sy) * e;
+    let x = it.sx + (it.tx - it.sx) * e;
+    let y = it.sy + (it.ty - it.sy) * e;
+    if (snap) {
+      // Every frame is a legal arrangement on the same lattice the stitches
+      // end on, so blocks step from cell to cell instead of sliding between
+      // them. Off-lattice positions are what made it read as things flying
+      // about rather than as a pattern rearranging itself.
+      x = Math.round((x - offX) / cw) * cw + offX;
+      y = Math.round((y - offY) / ch) * ch + offY;
+    }
+    it.x = x;
+    it.y = y;
     buckets[it.level].push(it);
   }
   // Every stitch is drawn at full strength wherever it is: they are the same

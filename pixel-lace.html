@@ -393,9 +393,11 @@ function draw(frame = null) {
   }
   if (!grid) return;
   if (frame?.loose) {
+    const cw = S.w / grid.cols, ch = S.h / grid.rows;
     drawLoose(ctx, frame.loose.items, {
       ink: S.ink, shape: S.shape, size: frame.loose.size,
       levels: frame.loose.levels, phase: frame.phase,
+      cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
     });
     return;
   }
