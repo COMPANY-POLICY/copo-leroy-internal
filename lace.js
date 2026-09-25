@@ -558,7 +558,8 @@ export function drawLoose(ctx, items, o) {
   const {
     ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0,
     cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
-    path = "line", // "manhattan" turns a corner: across first, then down
+    path = "line",  // "manhattan" turns a corner: across first, then down
+    loosen = 0,     // over the last of the run, let them off the lattice again
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -581,8 +582,15 @@ export function drawLoose(ctx, items, o) {
       // end on, so blocks step from cell to cell instead of sliding between
       // them. Off-lattice positions are what made it read as things flying
       // about rather than as a pattern rearranging itself.
-      x = Math.round((x - offX) / cw) * cw + offX;
-      y = Math.round((y - offY) / ch) * ch + offY;
+      const sx2 = Math.round((x - offX) / cw) * cw + offX;
+      const sy2 = Math.round((y - offY) / ch) * ch + offY;
+      // ...except at the very end, where holding them to whole cells makes the
+      // last move a jump onto the mark. Easing off the lattice there lets them
+      // close the final fraction of a cell instead.
+      const k = loosen > 0 ? Math.max(0, Math.min(1, (e - (1 - loosen)) / loosen)) : 0;
+      const m = k * k * (3 - 2 * k);
+      x = sx2 + (x - sx2) * m;
+      y = sy2 + (y - sy2) * m;
     }
     it.x = x;
     it.y = y;

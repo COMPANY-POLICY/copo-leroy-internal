@@ -120,8 +120,10 @@ woven look: the grid decides what survives, the way a weave does.
   to the grid again. Every stitch moves together, one step per frame, so each
   frame is the whole set a step closer rather than a scatter of arrival times,
   and `Frames per second` only decides how long each step is held. The steps
-  are evenly spaced: the pairing keeps the trips short, roughly a cell per
-  step, so each frame lands somewhere new on the lattice. Every frame is a legal
+  close up towards each end rather than arriving at full stride, and over the
+  last of the run they ease off the lattice as well — held to whole cells right
+  to the end, the final move is a jump onto the mark rather than a landing. The
+  same easing runs in reverse going out, so it leaves gently too. Every frame is a legal
   arrangement on the same lattice the stitches end on, so blocks step from cell
   to cell rather than sliding between them — off-lattice positions are what
   made it read as things flying about instead of as a pattern rearranging

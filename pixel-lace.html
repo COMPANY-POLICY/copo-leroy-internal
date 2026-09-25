@@ -414,6 +414,7 @@ function draw(frame = null) {
       levels: frame.loose.levels, phase: frame.phase,
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
       path: S.transition === "corner" ? "manhattan" : "line",
+      loosen: 0.3,
     });
     return;
   }
@@ -608,11 +609,12 @@ function frameAt(n) {
       else if (k < steps + hold) step = steps;                   // arranged
       else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // opening out
       else step = 0;                                             // back in the grid
-      // Evenly spaced. Pairing each stitch to a nearby slot keeps the trips
-      // short — roughly a cell per step — so every frame lands somewhere new on
-      // the lattice. Easing them made the last steps move less than half a cell,
-      // which snapped to the same arrangement twice over.
-      return { loose: g, phase: step / steps };
+      // Eased a little, so the steps close up towards each end rather than
+      // arriving at full stride. The same easing runs in reverse on the way
+      // out, so it leaves gently too. Short late steps are no longer lost to
+      // the lattice — drawLoose eases off it over the last of the run.
+      const u = step / steps;
+      return { loose: g, phase: 1 - Math.pow(1 - u, 1.55) };
     }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
