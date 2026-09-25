@@ -111,17 +111,9 @@ woven look: the grid decides what survives, the way a weave does.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
-  threshold. What drives that is a field measured *through the shape* rather
-  than over the canvas: the distance from the heart of the pattern outward
-  along the pattern itself, as geodesic distance through the ink, then distance
-  outward from the ink for everything else so a front can push past the present
-  silhouette and grow new stitches. A wave keyed to the canvas centre would
-  sweep across the panel regardless of what was drawn on it; this one runs out
-  along the arms the motif actually has. `grow` sends a front out along them
-  and back, `pulse` sends bands one after another down the same route, `weight`
-  orders it by how solid each part already is, so the faint extremities go
-  first and the dense core last. `breathe` is the plain one, opening and
-  closing as a whole. The dither seed is held still throughout, since a moving
+  threshold. `weight` orders that by how solid each part of the pattern already
+  is, so the faint extremities go first and the dense core last; `breathe`
+  opens and closes as a whole. The dither seed is held still throughout, since a moving
   seed sparkles where a fixed one lets blocks step from cell to cell. `morph` walks a series
   of uploaded images — `Add images…` takes as many as you like, in the order
   picked — dissolving each into the next and looping. Each of those is placed
@@ -131,7 +123,18 @@ woven look: the grid decides what survives, the way a weave does.
   subject is whatever differs from it, and the zoom and anchor that put that
   subject in the frame follow from its bounds, which is what stops a series
   jumping in scale from image to image. Every image then keeps its own zoom
-  slider, and `Fit each` measures them all again. With no images loaded it dissolves one
+  slider, and `Fit each` measures them all again.
+
+  The change between two images is scheduled rather than faded. Both shapes are
+  measured — `shapeField` walks the ink from its densest point outward, then
+  walks outward from the ink for everything else — and each cell is given a
+  turn from the pair: the outgoing picture lets go at its extremities first,
+  the incoming one arrives at its heart first. Averaging two fields piles the
+  values up around the middle, so the turns are ranked rather than used raw,
+  which is what spreads the change evenly across the crossing instead of
+  passing in a frame or two. `Flare` brightens cells as the front reaches them,
+  so stitches gather along the edge of the change rather than the whole field
+  dimming and lifting. With no images loaded it dissolves one
   seed into the next instead. `Amount` is the hold in seconds there, and the
   depth of the wave elsewhere. Each frame
   is held rather than tweened — it is stop motion, and `Frames per second` sets

@@ -171,12 +171,12 @@
     <h2>Motion</h2>
     <label><select id="motion">
       <option value="none">still</option>
-      <option value="grow">grow — out along its own arms, then back</option>
-      <option value="pulse">pulse — bands travel through the form</option>
       <option value="weight">weight — the faint parts go first, the dense last</option>
       <option value="breathe">breathe — opens and closes as one</option>
       <option value="morph">morph — one image into the next</option>
     </select></label>
+    <label><span>Flare <b id="v-flare"></b></span>
+      <input id="flare" type="range" min="0" max="1.5" step="0.05" value="0.6" /></label>
     <label><span>Frames per second <b id="v-fps"></b></span>
       <input id="fps" type="range" min="2" max="24" step="1" value="8" /></label>
     <label><span id="amountLabel">Amount <b id="v-amount"></b></span>
@@ -222,16 +222,57 @@ const S = {
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
   border: true, corners: true, inset: 0.05, bands: 2,
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
-  motion: "none", fps: 8, amount: 0.4, seq: [],
+  motion: "none", fps: 8, amount: 0.4, flare: 0.6, seq: [],
 };
 
 let grid = null;
-let field = null;  // distance through the shape, for motion that follows it
 let seqGrids = []; // one grid per uploaded image, rebuilt only when settings change
+let orders = new Map(); // per pair: the order cells change hands in a morph
 
 // With no sequence loaded, a morph still has somewhere to go: the next seed.
 function morphTarget() {
   return buildSource({ seed: (S.seed + 1) >>> 0 });
+}
+
+// When each cell changes hands, rather than all of them at once. Measured from
+// both shapes: the outgoing one lets go at its extremities first, the incoming
+// one arrives at its heart first — so the picture is taken apart and the next
+// is assembled, instead of the two being faded through each other.
+function changeOrder(a, b, key) {
+  if (orders.has(key)) return orders.get(key);
+  const ink = Math.max(0.06, S.threshold * 0.6);
+  const fa = shapeField(a, { ink }).field;
+  const fb = shapeField(b, { ink }).field;
+  const raw = new Float32Array(fa.length);
+  for (let i = 0; i < raw.length; i++) raw[i] = 0.5 * (1 - fa[i]) + 0.5 * fb[i];
+
+  // Averaging two fields piles the values up around the middle, so nearly every
+  // cell would change hands at the same moment and the whole transition would
+  // pass in a frame or two. Rank them instead: each cell's turn is its position
+  // in the order, which spreads the change evenly across the crossing.
+  const idx = Array.from(raw.keys()).sort((a, b) => raw[a] - raw[b]);
+  const o = new Float32Array(raw.length);
+  for (let r = 0; r < idx.length; r++) o[idx[r]] = r / (idx.length - 1 || 1);
+  orders.set(key, o);
+  return o;
+}
+
+// A front sweeping across that order, with a flare on it: cells brighten as it
+// passes, so stitches appear along the edge of the change rather than the whole
+// field dimming and lifting.
+const RAMP = 0.26, FLARE = 0.3;
+function crossfade(a, b, k, key) {
+  const o = changeOrder(a, b, key);
+  const cells = new Float32Array(a.cells.length);
+  const f = k * (1 + 2 * RAMP) - RAMP; // so every cell gets its turn
+  for (let i = 0; i < cells.length; i++) {
+    const d = (f - o[i]) / RAMP;
+    const u = Math.max(0, Math.min(1, (d + 1) / 2));
+    const e = u * u * (3 - 2 * u);
+    const bump = Math.max(0, 1 - Math.abs(d));
+    cells[i] = a.cells[i] + (b.cells[i] - a.cells[i]) * e + FLARE * bump * bump * S.flare;
+  }
+  return { cols: a.cols, rows: a.rows, cells };
 }
 
 function blend(a, b, t) {
@@ -249,7 +290,7 @@ function build() {
     zoom: it.zoom, anchor: it.anchor,
   }));
   grid = seqGrids.length ? seqGrids[0] : buildSource();
-  field = null; // measured on demand — only the shape-led modes need it
+  orders.clear(); // the morph schedules go with the grids they described
   window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const rows = grid.rows;
   const usingImage = S.source !== "motif" && S.image;
@@ -353,8 +394,7 @@ function draw(frame = null) {
 let anim = { on: false, raf: 0, beat: 0, last: 0, tick: 0, morphB: null };
 
 function morphGrid(t) {
-  const e = t * t * (3 - 2 * t);
-  return blend(grid, anim.morphB, e);
+  return crossfade(grid, anim.morphB, t, "seed");
 }
 
 // A travelling field added to the coverage, so different parts of the pattern
@@ -362,13 +402,12 @@ function morphGrid(t) {
 // A single global threshold only made the whole thing fade in and out at once.
 // The dither seed is held still throughout on purpose — a moving seed sparkles,
 // a fixed one lets blocks step from cell to cell, which is what reads as motion.
-// fn is handed each cell's own coverage and its distance through the shape, so
-// what moves is keyed to the pattern rather than to the canvas it sits on
+// fn is handed each cell's own coverage, so what moves is keyed to the pattern
+// rather than to the canvas it sits on
 function waveFrame(t, fn) {
   const { cols, rows, cells } = grid;
-  if (!field) field = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
   const out = new Float32Array(cells.length);
-  for (let i = 0; i < cells.length; i++) out[i] = cells[i] + fn(field[i], cells[i], t);
+  for (let i = 0; i < cells.length; i++) out[i] = cells[i] + fn(cells[i], t);
   return { grid: { cols, rows, cells: out } };
 }
 
@@ -378,17 +417,9 @@ function frameAt(n) {
   const t = n / Math.max(1, S.fps);
   switch (S.motion) {
     case "breathe":
-      return waveFrame(t, (g, cov, t) => Math.sin(t * 2.2) * amt * 0.22);
-    case "grow":
-      // a front running out along the shape from its heart, and back
-      return waveFrame(t, (g, cov, t) => {
-        const front = (Math.sin(t * 1.4) * 0.5 + 0.5) * 1.2;
-        return Math.tanh((front - g) * 5) * amt * 0.34;
-      });
-    case "pulse": // bands following the same route, one after another
-      return waveFrame(t, (g, cov, t) => Math.sin(g * 16 - t * 3.2) * amt * 0.3);
+      return waveFrame(t, (cov, t) => Math.sin(t * 2.2) * amt * 0.22);
     case "weight": // ordered by how solid each part of the pattern already is
-      return waveFrame(t, (g, cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
+      return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
     case "morph": {
       if (seqGrids.length > 1) {
         // walk the series: each image holds, then dissolves into the next
@@ -398,9 +429,8 @@ function frameAt(n) {
         const i = Math.floor(u / per);
         const f = (u % per) / per;
         const k = Math.max(0, Math.min(1, (f - 0.3) / 0.45)); // hold, then cross
-        return {
-          grid: blend(seqGrids[i], seqGrids[(i + 1) % seqGrids.length], k * k * (3 - 2 * k)),
-        };
+        const j = (i + 1) % seqGrids.length;
+        return { grid: crossfade(seqGrids[i], seqGrids[j], k, `${i}>${j}`) };
       }
       if (seqGrids.length === 1) return null; // nothing to cross to yet
       // built on demand, not only when playback starts
@@ -457,7 +487,7 @@ new ResizeObserver(fit).observe($("stageWrap"));
 // grid/ink params only need a redraw; motif params need the motif again
 const f2 = (v) => v.toFixed(2);
 const SLIDERS = [
-  ["fps", "fps", true], ["amount", "amount", true, f2],
+  ["fps", "fps", true], ["amount", "amount", true, f2], ["flare", "flare", true, f2],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
   ["contrast", "contrast", true, (v) => v.toFixed(1)],
@@ -505,7 +535,7 @@ function syncControls() {
 }
 
 // a seed is only worth having if you can get back to it
-const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "stems", "spread", "leafiness", "weight",
+const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
   "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h"];
 let hashLock = false;
