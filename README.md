@@ -111,11 +111,19 @@ woven look: the grid decides what survives, the way a weave does.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
-  threshold. `shimmer` hands each frame a new noise field, so stitches at the
-  edge of the threshold flicker while the composition holds; `breathe` swings
-  the threshold, so the lace opens and closes; `morph` dissolves one seed into
-  the next and back; `scroll` reads the field from a moving offset while the
-  dither stays put, so the pattern travels and the texture does not. Each frame
+  threshold. Most modes add a travelling field to the coverage, so parts of the
+  pattern cross the threshold at different moments and stitches march along its
+  arms — a single global threshold only fades the whole thing in and out at
+  once. `ripple` sends waves out from the centre, `bloom` grows the lace
+  outward and draws it back, `flow` churns it in patches (on mirrored
+  coordinates, so the churn keeps the motif's symmetry), `breathe` pulses as
+  one. `shimmer` instead hands each frame a new noise field, so stitches at the
+  edge flicker; the wave modes hold that seed still on purpose, since a moving
+  seed sparkles where a fixed one lets blocks step from cell to cell. `morph`
+  dissolves one seed into the next and back — or, with `Morph to…`, into a
+  second image, which may be a photograph against a generated damask. `scroll`
+  reads the field from a moving offset while the dither stays put, so the
+  pattern travels and the texture does not. Each frame
   is held rather than tweened — it is stop motion, and `Frames per second` sets
   how choppy. `Record 5s` captures the canvas to mp4 where the browser supports
   it, webm otherwise.
