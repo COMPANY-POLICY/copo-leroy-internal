@@ -555,12 +555,13 @@ export function drawStitches(ctx, grid, o) {
 // turn is, and is drawn somewhere along that line — so they arrive rather than
 // appear, and at phase 1 they sit exactly where the still composition puts them.
 export function drawLoose(ctx, items, o) {
-  const { ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0.55 } = o;
+  const { ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0 } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
   for (const it of items) {
-    const u = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
-    const e = 1 - Math.pow(1 - u, 3); // eases off as it lands
+    // linear, and by default everything moves together: the point is that each
+    // frame is the whole set a step closer, not a scatter of arrival times
+    const e = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
     it.x = it.sx + (it.tx - it.sx) * e;
     it.y = it.sy + (it.ty - it.sy) * e;
     buckets[it.level].push(it);

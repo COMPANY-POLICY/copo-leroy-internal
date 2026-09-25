@@ -176,6 +176,8 @@
       <option value="breathe">breathe — opens and closes as one</option>
       <option value="morph">morph — one image into the next</option>
     </select></label>
+    <label><span>Steps <b id="v-steps"></b></span>
+      <input id="steps" type="range" min="4" max="40" step="1" value="15" /></label>
     <label><span>Flare <b id="v-flare"></b></span>
       <input id="flare" type="range" min="0" max="1.5" step="0.05" value="0.6" /></label>
     <label><span>Frames per second <b id="v-fps"></b></span>
@@ -223,7 +225,7 @@ const S = {
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
   border: true, corners: true, inset: 0.05, bands: 2,
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
-  motion: "none", fps: 8, amount: 0.4, flare: 0.6, seq: [],
+  motion: "none", fps: 8, amount: 0.4, flare: 0.6, steps: 15, seq: [],
 };
 
 let grid = null;
@@ -502,16 +504,25 @@ function frameAt(n) {
     case "breathe":
       return waveFrame(t, (cov, t) => Math.sin(t * 2.2) * amt * 0.22);
     case "gather": {
+      // Counted in frames rather than seconds: one step per frame, so Steps is
+      // exactly how many stages there are between the grid and the pattern and
+      // each one is a legible position. Frames per second sets how long each is
+      // held.
       const g = looseStitches();
-      const travel = 1.7, hold = 0.4 + amt * 3;
-      const cycle = travel * 2 + hold * 2;
-      const p = ((t % cycle) + cycle) % cycle;
-      let phase;
-      if (p < travel) phase = p / travel;                       // coming together
-      else if (p < travel + hold) phase = 1;                    // formed
-      else if (p < travel * 2 + hold) phase = 1 - (p - travel - hold) / travel; // apart
-      else phase = 0;
-      return { loose: g, phase };
+      const steps = Math.max(2, Math.round(S.steps));
+      const hold = Math.max(1, Math.round((0.4 + amt * 3) * S.fps));
+      const cycle = steps * 2 + hold * 2;
+      const k = ((n % cycle) + cycle) % cycle;
+      let step;
+      if (k < steps) step = k;                                   // closing in
+      else if (k < steps + hold) step = steps;                   // arranged
+      else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // opening out
+      else step = 0;                                             // back in the grid
+      // Spaced so it closes in quickly and then refines: at even spacing every
+      // frame looks equally unformed and the pattern only resolves in the last
+      // one or two. The steps stay discrete either way.
+      const u = step / steps;
+      return { loose: g, phase: 1 - Math.pow(1 - u, 2.2) };
     }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
@@ -583,6 +594,7 @@ new ResizeObserver(fit).observe($("stageWrap"));
 const f2 = (v) => v.toFixed(2);
 const SLIDERS = [
   ["fps", "fps", true], ["amount", "amount", true, f2], ["flare", "flare", true, f2],
+  ["steps", "steps", true],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
   ["contrast", "contrast", true, (v) => v.toFixed(1)],
@@ -630,7 +642,7 @@ function syncControls() {
 }
 
 // a seed is only worth having if you can get back to it
-const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "stems", "spread", "leafiness", "weight",
+const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
   "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h"];
 let hashLock = false;
