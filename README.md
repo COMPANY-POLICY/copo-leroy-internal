@@ -111,14 +111,18 @@ woven look: the grid decides what survives, the way a weave does.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
-  threshold. Most modes add a travelling field to the coverage, so parts of the
-  pattern cross the threshold at different moments and stitches march along its
-  arms — a single global threshold only fades the whole thing in and out at
-  once. `ripple` sends waves out from the centre, `bloom` grows the lace
-  outward and draws it back, `flow` churns it in patches (on mirrored
-  coordinates, so the churn keeps the motif's symmetry), `breathe` pulses as
-  one. The dither seed is held still throughout, since a moving seed sparkles
-  where a fixed one lets blocks step from cell to cell. `morph` walks a series
+  threshold. What drives that is a field measured *through the shape* rather
+  than over the canvas: the distance from the heart of the pattern outward
+  along the pattern itself, as geodesic distance through the ink, then distance
+  outward from the ink for everything else so a front can push past the present
+  silhouette and grow new stitches. A wave keyed to the canvas centre would
+  sweep across the panel regardless of what was drawn on it; this one runs out
+  along the arms the motif actually has. `grow` sends a front out along them
+  and back, `pulse` sends bands one after another down the same route, `weight`
+  orders it by how solid each part already is, so the faint extremities go
+  first and the dense core last. `breathe` is the plain one, opening and
+  closing as a whole. The dither seed is held still throughout, since a moving
+  seed sparkles where a fixed one lets blocks step from cell to cell. `morph` walks a series
   of uploaded images — `Add images…` takes as many as you like, in the order
   picked — dissolving each into the next and looping. Each of those is placed
   on its own, centred and whole, with no mirroring or repetition: it is a

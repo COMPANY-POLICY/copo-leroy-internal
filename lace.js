@@ -402,6 +402,87 @@ const BAYER = [
   [0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5],
 ].flat().map((v) => (v + 0.5) / 16);
 
+// A field measured through the shape, not over the canvas: how far each cell
+// lies from the heart of the pattern, travelling along the pattern itself.
+// Motion driven by this runs out along the arms the motif actually has, where
+// a wave keyed to the canvas centre would sweep across it regardless of what
+// is drawn there.
+//
+// Two passes: geodesic distance through the ink from its densest point, then
+// distance outward from the ink for everything else, so a front can push past
+// the present silhouette and grow new stitches rather than only erasing them.
+export function shapeField(grid, o = {}) {
+  const { cols, rows, cells } = grid;
+  const ink = o.ink ?? 0.12;
+  const n = cols * rows;
+  const dist = new Float32Array(n).fill(Infinity);
+
+  let sx = 0, sy = 0, count = 0;
+  for (let i = 0; i < n; i++) {
+    if (cells[i] < ink) continue;
+    sx += i % cols;
+    sy += (i / cols) | 0;
+    count++;
+  }
+  if (!count) return { field: new Float32Array(n), max: 1 };
+  const cx = sx / count, cy = sy / count;
+
+  const queue = new Int32Array(n);
+  let head = 0, tail = 0;
+  const push = (i, d) => { dist[i] = d; queue[tail++] = i; };
+
+  // start at the ink cell closest to the middle of the ink — the heart of it
+  let seed = -1, best = Infinity;
+  for (let i = 0; i < n; i++) {
+    if (cells[i] < ink) continue;
+    const dx = (i % cols) - cx, dy = ((i / cols) | 0) - cy, d = dx * dx + dy * dy;
+    if (d < best) { best = d; seed = i; }
+  }
+  push(seed, 0);
+
+  const walk = (through) => {
+    while (head < tail) {
+      const i = queue[head++];
+      const x = i % cols, y = (i / cols) | 0, d = dist[i] + 1;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (!ox && !oy) continue;
+          const nx = x + ox, ny = y + oy;
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          const j = ny * cols + nx;
+          if (dist[j] !== Infinity) continue;
+          if (through && cells[j] < ink) continue;
+          if (!through && cells[j] >= ink) continue;
+          push(j, d);
+        }
+      }
+    }
+  };
+  walk(true);
+
+  // pieces the walk could not reach — the frame is its own island — start from
+  // where each sits relative to the heart, so they move in step with it
+  for (let i = 0; i < n; i++) {
+    if (cells[i] < ink || dist[i] !== Infinity) continue;
+    const dx = (i % cols) - cx, dy = ((i / cols) | 0) - cy;
+    push(i, Math.hypot(dx, dy));
+    walk(true);
+  }
+
+  // then outward from the ink, so the front has somewhere to grow into
+  head = 0;
+  tail = 0;
+  for (let i = 0; i < n; i++) if (dist[i] !== Infinity) queue[tail++] = i;
+  walk(false);
+
+  let max = 0;
+  for (let i = 0; i < n; i++) if (dist[i] !== Infinity && dist[i] > max) max = dist[i];
+  max = max || 1;
+  const field = new Float32Array(n);
+  for (let i = 0; i < n; i++) field[i] = dist[i] === Infinity ? 1 : dist[i] / max;
+  return { field, max };
+}
+
 // Which cells get a stitch, and at what level — worked out once and shared by
 // the canvas and the SVG, so the file is what you were looking at.
 export function stitchCells(grid, o) {

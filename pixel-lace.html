@@ -165,9 +165,9 @@
     <h2>Motion</h2>
     <label><select id="motion">
       <option value="none">still</option>
-      <option value="ripple">ripple — waves travel out from the centre</option>
-      <option value="bloom">bloom — the lace grows outward and draws back</option>
-      <option value="flow">flow — it churns in patches</option>
+      <option value="grow">grow — out along its own arms, then back</option>
+      <option value="pulse">pulse — bands travel through the form</option>
+      <option value="weight">weight — the faint parts go first, the dense last</option>
       <option value="breathe">breathe — opens and closes as one</option>
       <option value="morph">morph — one image into the next</option>
     </select></label>
@@ -192,8 +192,7 @@
 </div>
 
 <script type="module">
-import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches, toSVG } from "./lace.js";
-import { valueNoise } from "./leroy-cursor.js";
+import { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches, toSVG, shapeField } from "./lace.js";
 
 const $ = (id) => document.getElementById(id);
 const download = (href, name) => {
@@ -219,6 +218,7 @@ const S = {
 };
 
 let grid = null;
+let field = null;  // distance through the shape, for motion that follows it
 let seqGrids = []; // one grid per uploaded image, rebuilt only when settings change
 
 // With no sequence loaded, a morph still has somewhere to go: the next seed.
@@ -239,6 +239,7 @@ function build() {
   seqGrids = S.seq.map((img) =>
     buildSource({ image: img, source: "imageLace", symmetry: "none" }));
   grid = seqGrids.length ? seqGrids[0] : buildSource();
+  field = null; // measured on demand — only the shape-led modes need it
   window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const rows = grid.rows;
   const usingImage = S.source !== "motif" && S.image;
@@ -350,18 +351,13 @@ function morphGrid(t) {
 // A single global threshold only made the whole thing fade in and out at once.
 // The dither seed is held still throughout on purpose — a moving seed sparkles,
 // a fixed one lets blocks step from cell to cell, which is what reads as motion.
+// fn is handed each cell's own coverage and its distance through the shape, so
+// what moves is keyed to the pattern rather than to the canvas it sits on
 function waveFrame(t, fn) {
   const { cols, rows, cells } = grid;
+  if (!field) field = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
   const out = new Float32Array(cells.length);
-  const hx = (cols - 1) / 2, hy = (rows - 1) / 2;
-  for (let ry = 0; ry < rows; ry++) {
-    const ny = (ry - hy) / hy;
-    for (let rx = 0; rx < cols; rx++) {
-      const nx = (rx - hx) / hx;
-      const i = ry * cols + rx;
-      out[i] = cells[i] + fn(nx, ny, Math.hypot(nx, ny), t);
-    }
-  }
+  for (let i = 0; i < cells.length; i++) out[i] = cells[i] + fn(field[i], cells[i], t);
   return { grid: { cols, rows, cells: out } };
 }
 
@@ -371,18 +367,17 @@ function frameAt(n) {
   const t = n / Math.max(1, S.fps);
   switch (S.motion) {
     case "breathe":
-      return waveFrame(t, (nx, ny, r, t) => Math.sin(t * 2.2) * amt * 0.22);
-    case "ripple":
-      return waveFrame(t, (nx, ny, r, t) => Math.sin(r * 7.5 - t * 3.4) * amt * 0.3);
-    case "bloom":
-      return waveFrame(t, (nx, ny, r, t) => {
-        const edge = (Math.sin(t * 1.5) * 0.5 + 0.5) * 1.45; // the front, sweeping out and back
-        return Math.tanh((edge - r) * 2.6) * amt * 0.34;
+      return waveFrame(t, (g, cov, t) => Math.sin(t * 2.2) * amt * 0.22);
+    case "grow":
+      // a front running out along the shape from its heart, and back
+      return waveFrame(t, (g, cov, t) => {
+        const front = (Math.sin(t * 1.4) * 0.5 + 0.5) * 1.2;
+        return Math.tanh((front - g) * 5) * amt * 0.34;
       });
-    case "flow":
-      // mirrored coordinates, so the churn keeps the motif's own symmetry
-      return waveFrame(t, (nx, ny, r, t) =>
-        (valueNoise(Math.abs(nx) * 2.4 + t * 0.55, Math.abs(ny) * 2.4 - t * 0.3) - 0.5) * 2 * amt * 0.38);
+    case "pulse": // bands following the same route, one after another
+      return waveFrame(t, (g, cov, t) => Math.sin(g * 16 - t * 3.2) * amt * 0.3);
+    case "weight": // ordered by how solid each part of the pattern already is
+      return waveFrame(t, (g, cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
     case "morph": {
       if (seqGrids.length > 1) {
         // walk the series: each image holds, then dissolves into the next
