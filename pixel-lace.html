@@ -169,19 +169,17 @@
       <option value="bloom">bloom — the lace grows outward and draws back</option>
       <option value="flow">flow — it churns in patches</option>
       <option value="breathe">breathe — opens and closes as one</option>
-      <option value="shimmer">shimmer — stitches reshuffle</option>
-      <option value="morph">morph — one seed into the next</option>
-      <option value="scroll">scroll — the field travels</option>
+      <option value="morph">morph — one image into the next</option>
     </select></label>
     <label><span>Frames per second <b id="v-fps"></b></span>
       <input id="fps" type="range" min="2" max="24" step="1" value="8" /></label>
-    <label><span>Amount <b id="v-amount"></b></span>
+    <label><span id="amountLabel">Amount <b id="v-amount"></b></span>
       <input id="amount" type="range" min="0.05" max="1" step="0.05" value="0.4" /></label>
     <div class="row">
-      <button id="morphImg">Morph to…</button>
+      <button id="morphImg">Add images…</button>
       <button id="clearMorphImg">Clear</button>
     </div>
-    <input type="file" id="fileB" accept="image/*" hidden />
+    <input type="file" id="fileB" accept="image/*" multiple hidden />
     <div class="row" style="margin-top:6px">
       <button id="play">Play</button>
       <button id="record">Record 5s</button>
@@ -217,30 +215,36 @@ const S = {
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
   border: true, corners: true, inset: 0.05, bands: 2,
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
-  motion: "none", fps: 8, amount: 0.4, imageB: null,
+  motion: "none", fps: 8, amount: 0.4, seq: [],
 };
 
 let grid = null;
+let seqGrids = []; // one grid per uploaded image, rebuilt only when settings change
 
-// The far end of a morph: a second image if one has been given, otherwise the
-// next seed along. An image against a motif is allowed — the damask dissolving
-// into a photograph is worth having.
+// With no sequence loaded, a morph still has somewhere to go: the next seed.
 function morphTarget() {
-  if (S.imageB) {
-    return buildSource({
-      image: S.imageB,
-      source: S.source === "motif" ? "imageLace" : S.source,
-    });
-  }
   return buildSource({ seed: (S.seed + 1) >>> 0 });
 }
 
+function blend(a, b, t) {
+  const cells = new Float32Array(a.cells.length);
+  for (let i = 0; i < cells.length; i++)
+    cells[i] = a.cells[i] + (b.cells[i] - a.cells[i]) * t;
+  return { cols: a.cols, rows: a.rows, cells };
+}
+
 function build() {
-  grid = buildSource();
+  // Each image in the sequence is placed on its own — centred, whole, with no
+  // mirroring or repetition. It is a series of pictures, not a pattern.
+  seqGrids = S.seq.map((img) =>
+    buildSource({ image: img, source: "imageLace", symmetry: "none" }));
+  grid = seqGrids.length ? seqGrids[0] : buildSource();
   window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const rows = grid.rows;
   const usingImage = S.source !== "motif" && S.image;
-  const what = usingImage ? (S.source === "imageLace" ? "image laced" : "image") : `seed ${S.seed}`;
+  const what = seqGrids.length
+    ? `${seqGrids.length} image${seqGrids.length > 1 ? "s" : ""}`
+    : usingImage ? (S.source === "imageLace" ? "image laced" : "image") : `seed ${S.seed}`;
   $("info").textContent = `${S.cols} × ${rows} stitches · ${S.symmetry} · ${what}`;
   anim.morphB = null; // the far end of a morph belongs to the seed that just changed
   draw();
@@ -250,6 +254,7 @@ function buildSource(over = {}) {
   const seed = over.seed ?? S.seed;
   const source = over.source ?? S.source;
   const image = over.image ?? S.image;
+  const symmetry = over.symmetry ?? S.symmetry;
   const rows = Math.max(4, Math.round((S.cols * S.h) / S.w));
   // render the motif far above grid resolution, so each cell has real coverage
   // ten render pixels per cell gives each one real coverage to average, but it
@@ -270,7 +275,7 @@ function buildSource(over = {}) {
     g.rect(f.x, f.y, f.w, f.h);
     g.clip();
     g.translate(f.x, f.y);
-    if (source === "imageLace") drawImageLace(g, f.w, f.h, image, S);
+    if (source === "imageLace") drawImageLace(g, f.w, f.h, image, { ...S, symmetry });
     else {
       const img = image;
       const s = Math.max(f.w / img.width, f.h / img.height);
@@ -327,7 +332,6 @@ function draw(frame = null) {
     threshold: frame?.threshold ?? S.threshold,
     contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither,
     seed: frame?.seed ?? S.seed,
-    shiftX: frame?.shiftX || 0, shiftY: frame?.shiftY || 0,
   });
 }
 
@@ -337,18 +341,15 @@ function draw(frame = null) {
 let anim = { on: false, raf: 0, beat: 0, last: 0, tick: 0, morphB: null };
 
 function morphGrid(t) {
-  const a = grid.cells, b = anim.morphB.cells;
-  const cells = new Float32Array(a.length);
   const e = t * t * (3 - 2 * t);
-  for (let i = 0; i < a.length; i++) cells[i] = a[i] + (b[i] - a[i]) * e;
-  return { cols: grid.cols, rows: grid.rows, cells };
+  return blend(grid, anim.morphB, e);
 }
 
 // A travelling field added to the coverage, so different parts of the pattern
 // cross the threshold at different moments and stitches march along its arms.
 // A single global threshold only made the whole thing fade in and out at once.
-// The dither seed is held still here on purpose — a moving seed sparkles, a
-// fixed one lets blocks step from cell to cell.
+// The dither seed is held still throughout on purpose — a moving seed sparkles,
+// a fixed one lets blocks step from cell to cell, which is what reads as motion.
 function waveFrame(t, fn) {
   const { cols, rows, cells } = grid;
   const out = new Float32Array(cells.length);
@@ -369,8 +370,6 @@ function frameAt(n) {
   // seconds, not frames — so fps changes how choppy it is, not how fast
   const t = n / Math.max(1, S.fps);
   switch (S.motion) {
-    case "shimmer": // a new noise field each beat: stitches at the edge flicker
-      return { seed: (S.seed + n * 7919) >>> 0, threshold: S.threshold - amt * 0.06 };
     case "breathe":
       return waveFrame(t, (nx, ny, r, t) => Math.sin(t * 2.2) * amt * 0.22);
     case "ripple":
@@ -385,14 +384,25 @@ function frameAt(n) {
       return waveFrame(t, (nx, ny, r, t) =>
         (valueNoise(Math.abs(nx) * 2.4 + t * 0.55, Math.abs(ny) * 2.4 - t * 0.3) - 0.5) * 2 * amt * 0.38);
     case "morph": {
+      if (seqGrids.length > 1) {
+        // walk the series: each image holds, then dissolves into the next
+        const per = 0.4 + S.amount * 3; // Amount is the hold, in seconds
+        const span = seqGrids.length * per;
+        const u = ((t % span) + span) % span;
+        const i = Math.floor(u / per);
+        const f = (u % per) / per;
+        const k = Math.max(0, Math.min(1, (f - 0.3) / 0.45)); // hold, then cross
+        return {
+          grid: blend(seqGrids[i], seqGrids[(i + 1) % seqGrids.length], k * k * (3 - 2 * k)),
+        };
+      }
+      if (seqGrids.length === 1) return null; // nothing to cross to yet
       // built on demand, not only when playback starts
       if (!anim.morphB) anim.morphB = morphTarget();
       const period = Math.max(2, Math.round(S.fps * 2));
-      const t = (n % period) / period;
-      return { grid: morphGrid(t < 0.5 ? t * 2 : 2 - t * 2) };
+      const p = (n % period) / period;
+      return { grid: morphGrid(p < 0.5 ? p * 2 : 2 - p * 2) };
     }
-    case "scroll":
-      return { shiftX: Math.round(n * amt * 2), shiftY: 0 };
     default:
       return null;
   }
@@ -478,6 +488,7 @@ function syncControls() {
   $("source").value = S.source;
   $("read").value = S.read;
   $("motion").value = S.motion;
+  amountLabel();
   $("shape").value = S.shape;
   $("bg").value = S.bg;
   $("ink").value = S.ink;
@@ -519,8 +530,16 @@ $("source").addEventListener("change", (e) => {
   writeHash();
 });
 $("read").addEventListener("change", (e) => { S.read = e.target.value; build(); writeHash(); });
+// Amount means different things per mode, so the label says which
+function amountLabel() {
+  $("amountLabel").innerHTML = S.motion === "morph"
+    ? `Hold each <b id="v-amount">${(0.4 + S.amount * 3).toFixed(1)}s</b>`
+    : `Amount <b id="v-amount">${S.amount.toFixed(2)}</b>`;
+}
+$("amount").addEventListener("input", amountLabel);
 $("motion").addEventListener("change", (e) => {
   S.motion = e.target.value;
+  amountLabel();
   stopMotion();
   if (S.motion !== "none") startMotion();
   writeHash();
@@ -528,7 +547,7 @@ $("motion").addEventListener("change", (e) => {
 $("play").addEventListener("click", () => (anim.on ? stopMotion() : startMotion()));
 $("record").addEventListener("click", async (e) => {
   const btn = e.currentTarget;
-  if (S.motion === "none") { S.motion = "shimmer"; $("motion").value = "shimmer"; }
+  if (S.motion === "none") { S.motion = "ripple"; $("motion").value = "ripple"; }
   if (!anim.on) startMotion();
   const stream = stage.captureStream(Math.max(S.fps, 12));
   // mp4 first — it is what the social apps take without converting
@@ -553,29 +572,36 @@ $("record").addEventListener("click", async (e) => {
 });
 $("upload").addEventListener("click", () => $("file").click());
 $("morphImg").addEventListener("click", () => $("fileB").click());
-$("fileB").addEventListener("change", (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  const url = URL.createObjectURL(f);
-  const img = new Image();
-  img.onload = () => {
-    S.imageB = img;
-    anim.morphB = null;
-    $("morphImg").dataset.on = "true";
-    $("morphImg").textContent = "Morph to: set";
-    if (S.motion !== "morph") { S.motion = "morph"; $("motion").value = "morph"; }
+function seqLabel() {
+  const n = S.seq.length;
+  $("morphImg").dataset.on = String(n > 0);
+  $("morphImg").textContent = n ? `${n} image${n > 1 ? "s" : ""} — add more…` : "Add images…";
+}
+$("fileB").addEventListener("change", async (e) => {
+  const files = [...e.target.files].filter((f) => f.type.startsWith("image/"));
+  if (!files.length) return;
+  // keep the order they were picked in — it is a sequence
+  for (const f of files) {
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.src = url;
+    try { await img.decode(); } catch { continue; }
     URL.revokeObjectURL(url);
-    stopMotion();
-    startMotion();
-  };
-  img.src = url;
+    S.seq.push(img);
+  }
+  e.target.value = "";
+  seqLabel();
+  if (S.motion !== "morph") { S.motion = "morph"; $("motion").value = "morph"; }
+  build();
+  stopMotion();
+  if (S.seq.length > 1) startMotion();
 });
 $("clearMorphImg").addEventListener("click", () => {
-  S.imageB = null;
+  S.seq = [];
   anim.morphB = null;
-  $("morphImg").dataset.on = "false";
-  $("morphImg").textContent = "Morph to…";
-  draw();
+  seqLabel();
+  stopMotion();
+  build();
 });
 $("file").addEventListener("change", (e) => e.target.files[0] && loadImage(e.target.files[0]));
 $("symmetry").addEventListener("change", (e) => {

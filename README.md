@@ -117,13 +117,14 @@ woven look: the grid decides what survives, the way a weave does.
   once. `ripple` sends waves out from the centre, `bloom` grows the lace
   outward and draws it back, `flow` churns it in patches (on mirrored
   coordinates, so the churn keeps the motif's symmetry), `breathe` pulses as
-  one. `shimmer` instead hands each frame a new noise field, so stitches at the
-  edge flicker; the wave modes hold that seed still on purpose, since a moving
-  seed sparkles where a fixed one lets blocks step from cell to cell. `morph`
-  dissolves one seed into the next and back — or, with `Morph to…`, into a
-  second image, which may be a photograph against a generated damask. `scroll`
-  reads the field from a moving offset while the dither stays put, so the
-  pattern travels and the texture does not. Each frame
+  one. The dither seed is held still throughout, since a moving seed sparkles
+  where a fixed one lets blocks step from cell to cell. `morph` walks a series
+  of uploaded images — `Add images…` takes as many as you like, in the order
+  picked — dissolving each into the next and looping. Each of those is placed
+  on its own, centred and whole, with no mirroring or repetition: it is a
+  series of pictures, not a pattern. With no images loaded it dissolves one
+  seed into the next instead. `Amount` is the hold in seconds there, and the
+  depth of the wave elsewhere. Each frame
   is held rather than tweened — it is stop motion, and `Frames per second` sets
   how choppy. `Record 5s` captures the canvas to mp4 where the browser supports
   it, webm otherwise.

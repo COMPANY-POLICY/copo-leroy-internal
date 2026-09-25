@@ -409,7 +409,6 @@ export function stitchCells(grid, o) {
   const {
     x = 0, y = 0, w, h, levels = 3, threshold = 0.5,
     contrast = 1, gap = 0.18, dither = 0.35, seed = 7,
-    shiftX = 0, shiftY = 0, // read the field from an offset, wrapping around
   } = o;
   const cw = w / cols, ch = h / rows;
   const size = Math.min(cw, ch) * (1 - gap);
@@ -418,15 +417,9 @@ export function stitchCells(grid, o) {
   for (let i = 0; i < noise.length; i++) noise[i] = rnd();
 
   const byLevel = Array.from({ length: levels + 1 }, () => []);
-  const wrap = (v, n) => ((v % n) + n) % n;
   for (let ry = 0; ry < rows; ry++) {
     for (let rx = 0; rx < cols; rx++) {
-      // the field can be read from an offset while the dither stays put, so a
-      // scroll moves the pattern and not the texture
-      const i = shiftX || shiftY
-        ? wrap(ry + shiftY, rows) * cols + wrap(rx + shiftX, cols)
-        : ry * cols + rx;
-      const ni = ry * cols + rx;
+      const i = ry * cols + rx;
       // threshold is a floor, not a pivot: below it the cell stays bare, and
       // what is left is stretched back over the full range. Without that, a
       // photograph's dark ground still stitches a dim cell everywhere.
@@ -435,7 +428,7 @@ export function stitchCells(grid, o) {
       v = Math.max(0, Math.min(1, 0.5 + (v - 0.5) * contrast));
       if (v <= 0) continue;
       const d = (BAYER[(ry % 4) * 4 + (rx % 4)] - 0.5) * dither
-        + (noise[ni] - 0.5) * dither * 0.6;
+        + (noise[i] - 0.5) * dither * 0.6;
       const lv = Math.ceil(Math.max(0, Math.min(1, v + d)) * levels);
       if (lv < 1) continue;
       byLevel[Math.min(levels, lv)].push([
