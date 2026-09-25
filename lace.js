@@ -558,6 +558,7 @@ export function drawLoose(ctx, items, o) {
   const {
     ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0,
     cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
+    path = "line", // "manhattan" turns a corner: across first, then down
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -566,8 +567,15 @@ export function drawLoose(ctx, items, o) {
     // linear, and by default everything moves together: the point is that each
     // frame is the whole set a step closer, not a scatter of arrival times
     const e = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
-    let x = it.sx + (it.tx - it.sx) * e;
-    let y = it.sy + (it.ty - it.sy) * e;
+    let x, y;
+    if (path === "manhattan") {
+      const ex = Math.min(1, e * 2), ey = Math.max(0, e * 2 - 1);
+      x = it.sx + (it.tx - it.sx) * ex;
+      y = it.sy + (it.ty - it.sy) * ey;
+    } else {
+      x = it.sx + (it.tx - it.sx) * e;
+      y = it.sy + (it.ty - it.sy) * e;
+    }
     if (snap) {
       // Every frame is a legal arrangement on the same lattice the stitches
       // end on, so blocks step from cell to cell instead of sliding between

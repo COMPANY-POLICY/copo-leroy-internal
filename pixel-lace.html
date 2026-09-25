@@ -176,6 +176,14 @@
       <option value="breathe">breathe — opens and closes as one</option>
       <option value="morph">morph — one image into the next</option>
     </select></label>
+    <label><select id="transition">
+      <option value="contract">contract — from an even grid, nearest first</option>
+      <option value="corner">corner — across, then down</option>
+      <option value="fall">fall — down the column into place</option>
+      <option value="edges">edges — in from the sides</option>
+      <option value="settle">settle — the shortest move each can make</option>
+      <option value="swap">swap — from anywhere on the grid</option>
+    </select></label>
     <label><span>Steps <b id="v-steps"></b></span>
       <input id="steps" type="range" min="4" max="40" step="1" value="15" /></label>
     <label><span>Flare <b id="v-flare"></b></span>
@@ -225,7 +233,7 @@ const S = {
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
   border: true, corners: true, inset: 0.05, bands: 2,
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
-  motion: "none", fps: 8, amount: 0.4, flare: 0.6, steps: 15, seq: [],
+  motion: "none", fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
 };
 
 let grid = null;
@@ -398,6 +406,7 @@ function draw(frame = null) {
       ink: S.ink, shape: S.shape, size: frame.loose.size,
       levels: frame.loose.levels, phase: frame.phase,
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
+      path: S.transition === "corner" ? "manhattan" : "line",
     });
     return;
   }
@@ -424,13 +433,14 @@ function morphGrid(t) {
 // its core outward rather than arriving all at once.
 function looseStitches() {
   const key = [S.cols, S.levels, S.gap, S.shape, S.threshold, S.contrast, S.dither, S.seed,
-    S.w, S.h].join("|");
+    S.w, S.h, S.transition].join("|");
   if (loose && loose.key === key) return loose;
   const { byLevel, size, levels } = stitchCells(grid, drawOpts());
   const fld = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
   const cw = S.w / grid.cols, ch = S.h / grid.rows;
   const cx = S.w / 2, cy = S.h / 2;
 
+  const rnd = (() => { let a = 0x9e3779b9 ^ S.seed; return () => (a = (a * 1664525 + 1013904223) >>> 0) / 4294967296; })();
   const items = [];
   for (let l = 1; l <= levels; l++) {
     for (const [tx, ty] of byLevel[l]) {
@@ -460,6 +470,63 @@ function looseStitches() {
     for (let c = 0; c < inRow; c++) {
       slots.push([(c + pad + 0.5) * stepX - size / 2, (r + 0.5) * stepY - size / 2]);
     }
+  }
+
+  // Where they wait, and which one waits where, is the whole character of the
+  // transition — the travelling is the same straight walk in every case.
+  const kind = S.transition;
+  if (kind === "fall" || kind === "edges") {
+    for (const it of items) {
+      if (kind === "fall") {
+        it.sx = it.tx;
+        // columns start at staggered heights, so it does not drop in lockstep
+        it.sy = it.ty - S.h * (0.35 + (Math.floor(it.tx / cw) % 3) * 0.22);
+      } else {
+        const left = it.tx < S.w / 2;
+        it.sx = left ? it.tx - S.w * 0.55 : it.tx + S.w * 0.55;
+        it.sy = it.ty;
+      }
+    }
+    loose = { key, items, size, levels };
+    window.__loose = loose;
+    return loose;
+  }
+
+  if (kind === "swap") { // no pairing at all, for comparison
+    const shuffled = slots.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    items.forEach((it, i) => {
+      const slot = shuffled[i] || shuffled[shuffled.length - 1];
+      it.sx = slot[0];
+      it.sy = slot[1];
+    });
+    loose = { key, items, size, levels };
+    window.__loose = loose;
+    return loose;
+  }
+
+  if (kind === "settle") {
+    // each takes the closest slot still going — the least movement that still
+    // uses every slot, so the grid barely has to break up at all
+    const taken = new Uint8Array(slots.length);
+    for (const it of items) {
+      let best = -1, bd = Infinity;
+      for (let i = 0; i < slots.length; i++) {
+        if (taken[i]) continue;
+        const dx = slots[i][0] - it.tx, dy = slots[i][1] - it.ty, d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = i; }
+      }
+      if (best < 0) break;
+      taken[best] = 1;
+      it.sx = slots[best][0];
+      it.sy = slots[best][1];
+    }
+    loose = { key, items, size, levels };
+    window.__loose = loose;
+    return loose;
   }
 
   // Pair them along a Hilbert curve: it runs through two dimensions without
@@ -647,6 +714,7 @@ function syncControls() {
   $("source").value = S.source;
   $("read").value = S.read;
   $("motion").value = S.motion;
+  $("transition").value = S.transition;
   amountLabel();
   $("shape").value = S.shape;
   $("bg").value = S.bg;
@@ -658,7 +726,7 @@ function syncControls() {
 }
 
 // a seed is only worth having if you can get back to it
-const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "stems", "spread", "leafiness", "weight",
+const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
   "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h"];
 let hashLock = false;
@@ -696,6 +764,12 @@ function amountLabel() {
     : `Amount <b id="v-amount">${S.amount.toFixed(2)}</b>`;
 }
 $("amount").addEventListener("input", amountLabel);
+$("transition").addEventListener("change", (e) => {
+  S.transition = e.target.value;
+  loose = null; // the starting positions are what changes
+  if (!anim.on) draw(S.motion === "gather" ? frameAt(0) : null);
+  writeHash();
+});
 $("motion").addEventListener("change", (e) => {
   S.motion = e.target.value;
   amountLabel();

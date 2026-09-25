@@ -122,7 +122,15 @@ woven look: the grid decides what survives, the way a weave does.
   arrangement on the same lattice the stitches end on, so blocks step from cell
   to cell rather than sliding between them — off-lattice positions are what
   made it read as things flying about instead of as a pattern rearranging
-  itself. Each stitch is paired to its slot along a
+  itself. `Transition`
+  picks between six ways of getting there, all ending on the same arrangement:
+  `contract` from an even grid with each stitch taking a slot near where it is
+  needed; `corner` the same but turning a corner, across and then down; `fall`
+  down the column into place; `edges` in from the sides; `settle`, where each
+  takes the closest slot still going, so the grid barely breaks up at all; and
+  `swap`, paired at random, which is what the others are avoiding. Average trip
+  runs from about 105px for `settle` to 770px for `edges` on a 1400 × 1000
+  panel. In `contract` each stitch is paired to its slot along a
   Hilbert curve, which runs through two dimensions without favouring a
   direction, so neighbouring slots feed neighbouring targets and the set
   contracts evenly — ordering both by angle instead put a systematic twist
