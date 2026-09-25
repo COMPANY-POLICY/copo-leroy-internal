@@ -108,6 +108,17 @@ woven look: the grid decides what survives, the way a weave does.
   the border encloses and clipped to it, so the frame reads as a frame; widen
   the border and the pattern tightens with it. A dropped image is placed in that
   same field.
+- **Motion** — the grid is what moves, never the motif: re-running the vector
+  work per frame costs 35ms at 120 columns and far more above that, while the
+  stitches redraw in about one. What changes is which cells clear the
+  threshold. `shimmer` hands each frame a new noise field, so stitches at the
+  edge of the threshold flicker while the composition holds; `breathe` swings
+  the threshold, so the lace opens and closes; `morph` dissolves one seed into
+  the next and back; `scroll` reads the field from a moving offset while the
+  dither stays put, so the pattern travels and the texture does not. Each frame
+  is held rather than tweened — it is stop motion, and `Frames per second` sets
+  how choppy. `Record 5s` captures the canvas to mp4 where the browser supports
+  it, webm otherwise.
 - **Save PNG / Save SVG** — the SVG is the same stitches as vector, flattened:
   every stitch in one compound path on a transparent ground, so the file
   arrives as a single object to place, recolour or cut. Tone cannot survive
