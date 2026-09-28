@@ -127,7 +127,10 @@ woven look: the grid decides what survives, the way a weave does.
   where they sit. `Relief` puts a lit copy behind each stitch and a shaded one under it, and
   `Swell` scales a stitch with how solid that part of the pattern is, so
   density reads as weight rather than only as tone — one flat colour at one
-  size is what makes a panel read as a swatch. `Softness` feathers the stitches: they are drawn to their own layer and
+  size is what makes a panel read as a swatch. That size comes from the still
+  composition and stays put under motion: a stitch that grew or shrank between
+  frames would read as one that moved, where the wave modes are meant to change
+  only which stitches are lit and how strongly. `Softness` feathers the stitches: they are drawn to their own layer and
   composited through a blur, so the edges come off hard-cut while the ground
   underneath stays clean. It is a raster effect — the SVG export stays crisp.
 - **Border** — bands and corner scrolls. The motif is composed into the field
