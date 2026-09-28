@@ -148,7 +148,20 @@ woven look: the grid decides what survives, the way a weave does.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the
-  threshold — with one exception. `gather` moves the stitches themselves. They
+  threshold — with two exceptions, which move the stitches themselves.
+
+  `branch` grows the pattern out of its middle and leaves it there. Each
+  stitch's turn is when growth spreading through the ink would reach it — a
+  shortest walk out from the densest point — and it comes out of whichever
+  neighbouring cell lies closer in, so an arm extends along itself rather than
+  every stitch sliding in from one direction. The spread crosses ground that is
+  slow or quick in patches, which is what gives it fingers: cells the same
+  distance through the shape are reached across 0.16 of the run rather than
+  0.03. Independent noise per step will not do it — a shortest path routes
+  around any one slow cell and the front comes back smooth. `Amount` is how long
+  the grown symbol holds before starting over.
+
+  `gather` moves the stitches themselves. They
   wait in an even grid across the panel and are then arranged into the pattern
   over a counted number of frames — `Steps`, fifteen by default — and back out
   to the grid again. Every stitch moves together, one step per frame, so each
