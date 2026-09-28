@@ -112,6 +112,10 @@
       <input id="soft" type="range" min="0" max="3" step="0.1" value="0.8" /></label>
     <label><span>Dither <b id="v-dither"></b></span>
       <input id="dither" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
+    <label><select id="tone">
+      <option value="smooth">smooth tone — stitches fade</option>
+      <option value="stepped">stepped tone — stitches switch</option>
+    </select></label>
     <label><select id="shape">
       <option value="square">square stitch</option>
       <option value="dot">round stitch</option>
@@ -256,7 +260,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", tone: "smooth", soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
@@ -500,7 +504,7 @@ function draw(frame = null) {
       seed: frame?.seed ?? S.seed, relief: S.relief, swell: S.swell,
       // sizes come from the still composition, so motion changes which stitches
       // are lit and how strongly — never how big they are
-      sizeFrom: grid.cells,
+      sizeFrom: grid.cells, smooth: S.tone === "smooth",
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.speckle, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
@@ -730,7 +734,7 @@ function looseStitches() {
 function waveFrame(t, fn) {
   const { cols, rows, cells } = grid;
   const out = new Float32Array(cells.length);
-  for (let i = 0; i < cells.length; i++) out[i] = cells[i] + fn(cells[i], t);
+  for (let i = 0; i < cells.length; i++) out[i] = cells[i] + fn(cells[i], t, i);
   return { grid: { cols, rows, cells: out } };
 }
 
@@ -745,14 +749,21 @@ function frameFor(n) {
   // seconds, not frames — so fps changes how choppy it is, not how fast
   const t = n / Math.max(1, S.fps);
   switch (S.motion) {
-    case "breathe": {
-      // Moves the threshold, not the coverage. Threshold is a floor that the
-      // surviving values are stretched back over, so shifting it lifts and
-      // sinks the whole field — every stitch changes weight, not just the ones
-      // at the edge. Adding to coverage instead only wobbled the outline.
-      const swing = Math.sin(t * 1.6);
-      return { threshold: Math.max(0.02, Math.min(0.95, S.threshold - swing * amt * 0.25)) };
-    }
+    case "breathe":
+      // Every stitch on its own clock. One threshold for the whole panel moves
+      // every cell at the same instant, so a few hundred of them cross
+      // together and it reads as the field switching rather than as stitches
+      // fading. Given its own phase, each one drifts through its own opacity
+      // and only the ones near a boundary come and go.
+      return waveFrame(t, (cov, tt, i) => {
+        // and not all of them by the same amount. Stirring every stitch
+        // equally lifts the whole field a little, which reads as the panel
+        // pulsing; most of them holding while a few carry the change is what
+        // reads as stitches fading in and out of it.
+        const h = (Math.imul(i, 2246822519) >>> 0) / 4294967296;
+        const share = h * h * h;
+        return Math.sin(tt * 1.6 + i * 2.399963) * amt * 0.55 * share;
+      });
     case "gather": {
       // Counted in frames rather than seconds: one step per frame, so Steps is
       // exactly how many stages there are and each one is a legible position.
@@ -790,7 +801,7 @@ function frameFor(n) {
       return { loose: g, phase: shape(step) };
     }
     case "weight": // ordered by how solid each part of the pattern already is
-      return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
+      return waveFrame(t, (cov, tt) => Math.sin(tt * 2 - cov * 7) * amt * 0.3);
     case "morph": {
       if (seqGrids.length > 1) {
         // walk the series: each image holds, then dissolves into the next
@@ -905,6 +916,7 @@ function syncControls() {
   $("transition").value = S.transition;
   amountLabel();
   $("shape").value = S.shape;
+  $("tone").value = S.tone;
   markSwatches();
   $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
   for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
@@ -915,7 +927,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
+  "contrast", "tone", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -937,6 +949,7 @@ function readHash() {
   return any;
 }
 $("shape").addEventListener("change", (e) => { S.shape = e.target.value; draw(); writeHash(); });
+$("tone").addEventListener("change", (e) => { S.tone = e.target.value; draw(); writeHash(); });
 $("source").addEventListener("change", (e) => {
   S.source = e.target.value;
   if (S.source !== "motif" && !S.image) $("file").click();

@@ -703,27 +703,55 @@ export function stitchCells(grid, o) {
         x + rx * cw + (cw - size) / 2,
         y + ry * ch + (ch - size) / 2,
         Math.max(0, Math.min(1, (sizeFrom ? sizeFrom[i] : cells[i]))),
+        Math.max(0, Math.min(1, v + d)), // the value itself, before it was stepped
       ]);
     }
   }
   return { byLevel, size, levels };
 }
 
+// How many opacities a smooth-toned panel is allowed. Stepping to the level
+// count makes a stitch jump a third of its opacity when it crosses; at this
+// resolution the same crossing is a shade, which is what a dot easing in looks
+// like rather than one switching on.
+const SMOOTH_STEPS = 16;
+
 export function drawStitches(ctx, grid, o) {
   const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
-    scatter = 0, vary = 0, printSeed = 0 } = o;
+    scatter = 0, vary = 0, printSeed = 0, smooth = false } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
+  const marks = { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
+  const place = (cells) => (i) => {
+    const lsize = size * (1 - swell * (1 - cells[i][2]));
+    const off = (size - lsize) / 2;
+    return [cells[i][0] + off, cells[i][1] + off, lsize];
+  };
+
+  if (smooth) {
+    // grouped by the value each cell actually holds, not by which level it fell in
+    const buckets = Array.from({ length: SMOOTH_STEPS + 1 }, () => []);
+    for (let l = 1; l <= levels; l++) {
+      for (const c of byLevel[l]) {
+        const b = Math.max(1, Math.min(SMOOTH_STEPS, Math.ceil((c[3] ?? l / levels) * SMOOTH_STEPS)));
+        buckets[b].push(c);
+      }
+    }
+    for (let b = 1; b <= SMOOTH_STEPS; b++) {
+      const cells = buckets[b];
+      if (!cells.length) continue;
+      paintLevel(ctx, cells.length, place(cells), size, marks, b / SMOOTH_STEPS);
+    }
+    ctx.globalAlpha = 1;
+    return;
+  }
+
   for (let l = 1; l <= levels; l++) {
     const cells = byLevel[l];
     if (!cells.length) continue;
     // a stitch's weight follows its own place in the pattern, not the level it
     // happens to be lit at this moment — the level is what sets its opacity
-    paintLevel(ctx, cells.length, (i) => {
-      const lsize = size * (1 - swell * (1 - cells[i][2]));
-      const off = (size - lsize) / 2;
-      return [cells[i][0] + off, cells[i][1] + off, lsize];
-    }, size, { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed }, l / levels);
+    paintLevel(ctx, cells.length, place(cells), size, marks, l / levels);
   }
   ctx.globalAlpha = 1;
 }
