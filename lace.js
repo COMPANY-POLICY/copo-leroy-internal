@@ -704,6 +704,7 @@ export function stitchCells(grid, o) {
         y + ry * ch + (ch - size) / 2,
         Math.max(0, Math.min(1, (sizeFrom ? sizeFrom[i] : cells[i]))),
         Math.max(0, Math.min(1, v + d)), // the value itself, before it was stepped
+        i,                                // which cell it is, for per-stitch fades
       ]);
     }
   }
@@ -719,7 +720,10 @@ const SMOOTH_STEPS = 16;
 export function drawStitches(ctx, grid, o) {
   const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
-    scatter = 0, vary = 0, printSeed = 0, smooth = false } = o;
+    scatter = 0, vary = 0, printSeed = 0, smooth = false,
+    // fade(cellIndex) -> 0..1, multiplying a stitch's opacity. Nothing else
+    // about the stitch changes: same cell, same size, same place.
+    fade = null } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   const marks = { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
   const place = (cells) => (i) => {
@@ -728,13 +732,16 @@ export function drawStitches(ctx, grid, o) {
     return [cells[i][0] + off, cells[i][1] + off, lsize];
   };
 
-  if (smooth) {
-    // grouped by the value each cell actually holds, not by which level it fell in
+  if (smooth || fade) {
+    // grouped by the opacity each stitch ends up at, not by which level it fell in
     const buckets = Array.from({ length: SMOOTH_STEPS + 1 }, () => []);
     for (let l = 1; l <= levels; l++) {
       for (const c of byLevel[l]) {
-        const b = Math.max(1, Math.min(SMOOTH_STEPS, Math.ceil((c[3] ?? l / levels) * SMOOTH_STEPS)));
-        buckets[b].push(c);
+        let a = smooth ? (c[3] ?? l / levels) : l / levels;
+        if (fade) a *= fade(c[4]);
+        const b = Math.round(a * SMOOTH_STEPS);
+        if (b < 1) continue; // faded away entirely
+        buckets[Math.min(SMOOTH_STEPS, b)].push(c);
       }
     }
     for (let b = 1; b <= SMOOTH_STEPS; b++) {
