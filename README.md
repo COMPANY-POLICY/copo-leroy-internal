@@ -200,7 +200,13 @@ woven look: the grid decides what survives, the way a weave does.
   is held rather than tweened — it is stop motion, and `Frames per second` sets
   how choppy. `Record 5s` captures the canvas to mp4 where the browser supports
   it, webm otherwise.
-- **Save PNG / Save SVG** — the SVG is the same stitches as vector, flattened:
+- **Save PNG / Save SVG** — the SVG works the geometry out again rather than
+  tracing the canvas, so swell, scatter, vary, the offset and the speckle all
+  carry into it; against the canvas it differs by 2.7% of pixels where 2.6% is
+  the anti-aliasing baseline with all of them off. Relief cannot come along —
+  one path carries one fill and its lit and shaded copies are other colours —
+  and neither can grain, mottle or softness, which are raster effects. The SVG
+  is the same stitches as vector, flattened:
   every stitch in one compound path on a transparent ground, so the file
   arrives as a single object to place, recolour or cut. Tone cannot survive
   that — one path carries one fill — so the levels collapse to solid. Set

@@ -783,25 +783,51 @@ export function drawLoose(ctx, items, o) {
 // the levels collapse to solid. Set Levels to 1 and the canvas shows exactly
 // what the file will be.
 export function toSVG(grid, o) {
-  const { ink = "#2fe36a", shape = "square", w, h } = o;
+  const { ink = "#2fe36a", shape = "square", w, h,
+    swell = 0, scatter = 0, vary = 0, printSeed = 0,
+    offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   const n = (v) => Math.round(v * 100) / 100;
-  const r = n(size / 2), sz = n(size);
   const d = [];
+
+  // The same geometry the canvas draws — swell, scatter, vary and the offset —
+  // worked out again here rather than taken from the canvas, so the file is the
+  // arrangement and not a trace of it. Relief cannot come along: one path
+  // carries one fill, and its lit and shaded copies are other colours.
+  const mark = (x, y, sz) => {
+    const r = n(sz / 2), s2 = n(sz), X = n(x), Y = n(y);
+    if (shape === "dot") {
+      d.push(`M${X} ${n(y + sz / 2)}a${r} ${r} 0 1 0 ${s2} 0a${r} ${r} 0 1 0 ${n(-sz)} 0z`);
+    } else if (shape === "cross") {
+      const t = n(sz * 0.34), off = n((sz - sz * 0.34) / 2);
+      d.push(`M${X} ${n(y + off)}h${s2}v${t}h${n(-sz)}z`);
+      d.push(`M${n(x + off)} ${Y}h${t}v${s2}h${-t}z`);
+    } else {
+      d.push(`M${X} ${Y}h${s2}v${s2}h${n(-sz)}z`);
+    }
+  };
+
   for (let l = 1; l <= levels; l++) {
+    const lsize = size * (1 - swell * (1 - l / levels));
+    const loff = (size - lsize) / 2;
     for (const [px, py] of byLevel[l]) {
-      const x = n(px), y = n(py);
-      if (shape === "dot") {
-        d.push(`M${x} ${n(y + r)}a${r} ${r} 0 1 0 ${sz} 0a${r} ${r} 0 1 0 ${n(-size)} 0z`);
-      } else if (shape === "cross") {
-        const t = n(size * 0.34), off = n((size - size * 0.34) / 2);
-        d.push(`M${x} ${n(y + off)}h${sz}v${t}h${n(-size)}z`);
-        d.push(`M${n(x + off)} ${y}h${t}v${sz}h${-t}z`);
-      } else {
-        d.push(`M${x} ${y}h${sz}v${sz}h${n(-size)}z`);
+      const base = [px + loff, py + loff];
+      const c = scatter > 0 ? nudge(base[0], base[1], scatter, printSeed) : base;
+      const p = nudge(c[0], c[1], offset, offsetSeed);
+      const sz = vary > 0
+        ? lsize * (1 + (hash01(px, py, printSeed ^ 0x9e37) * 2 - 1) * vary)
+        : lsize;
+      const k = (lsize - sz) / 2;
+      mark(p[0] + k, p[1] + k, sz);
+      if (speckle > 0) {
+        for (let q = 0; q < 3; q++) {
+          const sp = nudge(p[0] + q * 37, p[1] - q * 53, lsize * 2.2 * speckle, speckleSeed + q * 911);
+          mark(sp[0], sp[1], lsize * (0.12 + 0.16 * ((q * 7) % 3) / 2));
+        }
       }
     }
   }
+
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">`,
     `<path fill="${ink}" d="${d.join("")}"/>`,
