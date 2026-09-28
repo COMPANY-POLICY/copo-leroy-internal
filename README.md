@@ -106,6 +106,10 @@ woven look: the grid decides what survives, the way a weave does.
   kaleidoscope of eight (a doily), or a half-drop repeat (wallpaper rather than
   a panel). The two radial modes work off the shorter side, so they suit a
   square panel best.
+- **Tone** — `smooth` gives a stitch its opacity from the value it actually
+  holds rather than the level it fell into, at sixteen steps. Stepped to the
+  level count, a crossing jumps a third of its opacity and switches on; at this
+  resolution it is a shade, and the stitch fades.
 - **Grid** — columns (up to 400 — past about 200 the damask stops reading as
   pixels and starts reading as embroidery), gap, stitch shape (square, round,
   cross), how many tonal levels, and dither, which breaks flat areas into
