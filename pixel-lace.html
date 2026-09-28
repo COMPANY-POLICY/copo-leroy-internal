@@ -94,8 +94,6 @@
       <input id="cols" type="range" min="24" max="400" step="2" value="120" /></label>
     <label><span>Gap <b id="v-gap"></b></span>
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
-    <label><span>Levels <b id="v-levels"></b></span>
-      <input id="levels" type="range" min="1" max="5" step="1" value="3" /></label>
     <label><span>Scatter <b id="v-scatter"></b></span>
       <input id="scatter" type="range" min="0" max="1.5" step="0.05" value="0" /></label>
     <label><span>Vary <b id="v-vary"></b></span>
@@ -112,10 +110,6 @@
       <input id="soft" type="range" min="0" max="3" step="0.1" value="0.8" /></label>
     <label><span>Dither <b id="v-dither"></b></span>
       <input id="dither" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
-    <label><select id="tone">
-      <option value="smooth">smooth tone — stitches fade</option>
-      <option value="stepped">stepped tone — stitches switch</option>
-    </select></label>
     <label><select id="shape">
       <option value="square">square stitch</option>
       <option value="dot">round stitch</option>
@@ -199,6 +193,7 @@
     <h2>Motion</h2>
     <label><select id="motion">
       <option value="none">still</option>
+      <option value="branch">branch — grows out from the middle along its arms</option>
       <option value="gather">gather — stitches fly in and settle into the shape</option>
       <option value="weight">weight — the faint parts go first, the dense last</option>
       <option value="breathe">breathe — opens and closes as one</option>
@@ -265,7 +260,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", tone: "smooth", soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
@@ -343,6 +338,7 @@ function build() {
   grid = seqGrids.length ? seqGrids[0] : buildSource();
   orders.clear(); // the morph schedules go with the grids they described
   loose = null;
+  branched = null;
   pairCache.clear();
   window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const rows = grid.rows;
@@ -500,7 +496,9 @@ function draw(frame = null) {
       levels: frame.loose.levels, phase: frame.phase,
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
       path: S.transition === "corner" ? "manhattan" : "line",
-      loosen: 0.3, relief: S.relief, swell: S.swell,
+      loosen: frame.emerge ? 1 : 0.3,
+      stagger: frame.stagger ?? 0,
+      emerge: !!frame.emerge, relief: S.relief, swell: S.swell,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.speckle, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
@@ -513,7 +511,7 @@ function draw(frame = null) {
       seed: frame?.seed ?? S.seed, relief: S.relief, swell: S.swell,
       // sizes come from the still composition, so motion changes which stitches
       // are lit and how strongly — never how big they are
-      sizeFrom: grid.cells, smooth: S.tone === "smooth", fade: frame?.fade || null,
+      sizeFrom: grid.cells, fade: frame?.fade || null,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.speckle, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
@@ -551,7 +549,7 @@ function loosePair(i) {
   const B = stitchCells(seqGrids[j], drawOpts());
   const flat = (set) => {
     const out = [];
-    for (let l = 1; l <= set.levels; l++) for (const p of set.byLevel[l]) out.push([p[0], p[1], l]);
+    for (let l = 1; l <= set.levels; l++) for (const p of set.byLevel[l]) out.push([p[0], p[1], l, p[2]]);
     return out;
   };
   const a = flat(A), b = flat(B);
@@ -560,8 +558,8 @@ function loosePair(i) {
     const u = (k * 2.399963) % (Math.PI * 2);
     return [S.w / 2 + Math.cos(u) * S.w * 0.75, S.h / 2 + Math.sin(u) * S.h * 0.75];
   };
-  while (a.length < n) { const r = rim(a.length); a.push([r[0], r[1], b[a.length][2]]); }
-  while (b.length < n) { const r = rim(b.length + 7919); b.push([r[0], r[1], a[b.length][2]]); }
+  while (a.length < n) { const r = rim(a.length); a.push([r[0], r[1], b[a.length][2], b[a.length][3]]); }
+  while (b.length < n) { const r = rim(b.length + 7919); b.push([r[0], r[1], a[b.length][2], a[b.length][3]]); }
 
   const ORDER = 8, SIDE = 1 << ORDER;
   const hilbert = (px, py) => {
@@ -588,11 +586,53 @@ function loosePair(i) {
   const items = [];
   for (let k = 0; k < n; k++) {
     const from = a[oa[k]], to = b[ob[k]];
-    items.push({ sx: from[0], sy: from[1], tx: to[0], ty: to[1], level: to[2], delay: 0, x: to[0], y: to[1] });
+    items.push({ sx: from[0], sy: from[1], tx: to[0], ty: to[1], level: to[2], w: to[3], delay: 0, x: to[0], y: to[1] });
   }
   const out = { key, items, size: B.size, levels: B.levels };
   pairCache.set(key, out);
   return out;
+}
+
+// For the branch: each stitch's turn comes from how far it lies through the
+// shape, and it emerges from whichever neighbouring cell lies closer to the
+// heart — which is what makes an arm extend along itself.
+let branched = null;
+function branchStitches() {
+  const key = [S.cols, S.levels, S.gap, S.shape, S.threshold, S.contrast, S.dither, S.seed,
+    S.w, S.h].join("|");
+  if (branched && branched.key === key) return branched;
+  const { byLevel, size, levels } = stitchCells(grid, drawOpts());
+  const fld = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
+  const { cols, rows } = grid;
+  const cw = S.w / cols, ch = S.h / rows;
+  const items = [];
+  for (let l = 1; l <= levels; l++) {
+    for (const cell of byLevel[l]) {
+      const [tx, ty] = cell;
+      const rx = Math.min(cols - 1, Math.max(0, Math.floor(tx / cw)));
+      const ry = Math.min(rows - 1, Math.max(0, Math.floor(ty / ch)));
+      const here = fld[ry * cols + rx];
+      let bx = 0, by = 0, best = here;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (!ox && !oy) continue;
+          const nx = rx + ox, ny = ry + oy;
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          const v = fld[ny * cols + nx];
+          if (v < best) { best = v; bx = ox; by = oy; }
+        }
+      }
+      items.push({
+        tx, ty, level: l, w: cell[2],
+        sx: tx + bx * cw * 1.1, sy: ty + by * ch * 1.1,
+        delay: Math.max(0, Math.min(1, here)),
+        x: tx, y: ty,
+      });
+    }
+  }
+  branched = { key, items, size, levels };
+  window.__branched = branched;
+  return branched;
 }
 
 // The stitches of the still composition, each given somewhere to come in from
@@ -611,11 +651,12 @@ function looseStitches() {
   const rnd = (() => { let a = 0x9e3779b9 ^ S.seed; return () => (a = (a * 1664525 + 1013904223) >>> 0) / 4294967296; })();
   const items = [];
   for (let l = 1; l <= levels; l++) {
-    for (const [tx, ty] of byLevel[l]) {
+    for (const cell of byLevel[l]) {
+      const [tx, ty] = cell;
       const rx = Math.min(grid.cols - 1, Math.max(0, Math.floor(tx / cw)));
       const ry = Math.min(grid.rows - 1, Math.max(0, Math.floor(ty / ch)));
       items.push({
-        tx, ty, level: l,
+        tx, ty, level: l, w: cell[2],
         sx: tx, sy: ty,
         delay: Math.min(1, fld[ry * grid.cols + rx] * 0.8 + 0.1),
         x: tx, y: ty, a: 1,
@@ -774,6 +815,58 @@ function frameFor(n) {
         },
       };
     }
+    case "branch": {
+      // Growth rather than arrival: each stitch takes its turn by how far it
+      // lies through the shape from the heart, and comes out of whichever
+      // neighbouring cell lies closer in — so a branch extends along itself
+      // instead of every stitch sliding in from one direction.
+      const steps = Math.max(2, Math.round(S.steps));
+      const hold = Math.max(1, Math.round((0.4 + amt * 3) * S.fps));
+      const cycle = steps * 2 + hold * 2;
+      const k = ((n % cycle) + cycle) % cycle;
+      let step;
+      if (k < steps) step = k;                                   // growing out
+      else if (k < steps + hold) step = steps;                   // grown
+      else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // drawing back
+      else step = 0;                                             // nothing there
+      return { loose: branchStitches(), phase: step / steps, emerge: true, stagger: 0.8 };
+    }
+    case "gather": {
+      // Counted in frames rather than seconds: one step per frame, so Steps is
+      // exactly how many stages there are and each one is a legible position.
+      // Frames per second sets how long each is held.
+      const steps = Math.max(2, Math.round(S.steps));
+      const hold = Math.max(1, Math.round((0.4 + amt * 3) * S.fps));
+      // Eased a little, so the steps close up towards each end rather than
+      // arriving at full stride. Short late steps are not lost to the lattice —
+      // drawLoose eases off it over the last of the run.
+      const shape = (step) => {
+        const u = step / steps;
+        return 1 - Math.pow(1 - u, 1.55);
+      };
+
+      if (seqGrids.length > 1) {
+        // A series walks one picture's stitches into the next and on to the
+        // one after, so each leg is a journey and a hold — there is nothing to
+        // come back out to, the way there is with a single pattern.
+        const leg = steps + hold;
+        const total = leg * seqGrids.length;
+        const k = ((n % total) + total) % total;
+        const i = Math.floor(k / leg);
+        const step = Math.min(steps, k % leg);
+        return { loose: loosePair(i), phase: shape(step) };
+      }
+
+      const g = looseStitches();
+      const cycle = steps * 2 + hold * 2;
+      const k = ((n % cycle) + cycle) % cycle;
+      let step;
+      if (k < steps) step = k;                                   // closing in
+      else if (k < steps + hold) step = steps;                   // arranged
+      else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // opening out
+      else step = 0;                                             // back in the grid
+      return { loose: g, phase: shape(step) };
+    }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, tt) => Math.sin(tt * 2 - cov * 7) * amt * 0.3);
     case "morph": {
@@ -845,7 +938,7 @@ const f2 = (v) => v.toFixed(2);
 const SLIDERS = [
   ["fps", "fps", true], ["amount", "amount", true, f2], ["flare", "flare", true, f2],
   ["steps", "steps", true],
-  ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
+  ["cols", "cols", false], ["gap", "gap", true, f2], 
   ["soft", "soft", true, f2], ["relief", "relief", true, f2], ["swell", "swell", true, f2],
   ["shadow", "shadow", true, f2],
   ["offset", "offset", true, f2], ["scatter", "scatter", true, f2],
@@ -890,7 +983,6 @@ function syncControls() {
   $("transition").value = S.transition;
   amountLabel();
   $("shape").value = S.shape;
-  $("tone").value = S.tone;
   markSwatches();
   $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
   for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
@@ -900,8 +992,8 @@ function syncControls() {
 
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
-  "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "tone", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
+  "medallion", "petals", "cols", "gap", "dither", "shape", "threshold",
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -923,7 +1015,6 @@ function readHash() {
   return any;
 }
 $("shape").addEventListener("change", (e) => { S.shape = e.target.value; draw(); writeHash(); });
-$("tone").addEventListener("change", (e) => { S.tone = e.target.value; draw(); writeHash(); });
 $("source").addEventListener("change", (e) => {
   S.source = e.target.value;
   if (S.source !== "motif" && !S.image) $("file").click();

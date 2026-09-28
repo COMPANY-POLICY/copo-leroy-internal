@@ -141,6 +141,10 @@ woven look: the grid decides what survives, the way a weave does.
   the border encloses and clipped to it, so the frame reads as a frame; widen
   the border and the pattern tightens with it. A dropped image is placed in that
   same field.
+- **Stitches are full strength.** Tone, stepped or smooth, put the faint parts
+  of the pattern in at a fraction of the ink, which reads as a print that did
+  not take: a stitch is either there or it is not. Density still carries
+  through `Swell`, which sizes each stitch by its own cell.
 - **Motion** — the grid is what moves, never the motif: re-running the vector
   work per frame costs 35ms at 120 columns and far more above that, while the
   stitches redraw in about one. What changes is which cells clear the

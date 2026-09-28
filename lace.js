@@ -711,16 +711,14 @@ export function stitchCells(grid, o) {
   return { byLevel, size, levels };
 }
 
-// How many opacities a smooth-toned panel is allowed. Stepping to the level
-// count makes a stitch jump a third of its opacity when it crosses; at this
-// resolution the same crossing is a shade, which is what a dot easing in looks
-// like rather than one switching on.
+// How finely a fading stitch is allowed to fade. Only the motions that fade
+// use it now — a stitch that is simply there is drawn at full strength.
 const SMOOTH_STEPS = 16;
 
 export function drawStitches(ctx, grid, o) {
   const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
-    scatter = 0, vary = 0, printSeed = 0, smooth = false,
+    scatter = 0, vary = 0, printSeed = 0,
     // fade(cellIndex) -> 0..1, multiplying a stitch's opacity. Nothing else
     // about the stitch changes: same cell, same size, same place.
     fade = null } = o;
@@ -732,13 +730,12 @@ export function drawStitches(ctx, grid, o) {
     return [cells[i][0] + off, cells[i][1] + off, lsize];
   };
 
-  if (smooth || fade) {
-    // grouped by the opacity each stitch ends up at, not by which level it fell in
+  if (fade) {
+    // grouped by the opacity each stitch ends up at
     const buckets = Array.from({ length: SMOOTH_STEPS + 1 }, () => []);
     for (let l = 1; l <= levels; l++) {
       for (const c of byLevel[l]) {
-        let a = smooth ? (c[3] ?? l / levels) : l / levels;
-        if (fade) a *= fade(c[4]);
+        let a = fade(c[4]);
         const b = Math.round(a * SMOOTH_STEPS);
         if (b < 1) continue; // faded away entirely
         buckets[Math.min(SMOOTH_STEPS, b)].push(c);
@@ -753,12 +750,13 @@ export function drawStitches(ctx, grid, o) {
     return;
   }
 
+  // Full strength, every one of them. Tone — stepped or smooth — put the faint
+  // parts of the pattern in at a fraction of the ink, which reads as a print
+  // that did not take; a stitch is either there or it is not.
   for (let l = 1; l <= levels; l++) {
     const cells = byLevel[l];
     if (!cells.length) continue;
-    // a stitch's weight follows its own place in the pattern, not the level it
-    // happens to be lit at this moment — the level is what sets its opacity
-    paintLevel(ctx, cells.length, place(cells), size, marks, l / levels);
+    paintLevel(ctx, cells.length, place(cells), size, marks, 1);
   }
   ctx.globalAlpha = 1;
 }
@@ -775,6 +773,7 @@ export function drawLoose(ctx, items, o) {
     loosen = 0,     // over the last of the run, let them off the lattice again
     relief = 0, swell = 0, offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
     scatter = 0, vary = 0, printSeed = 0,
+    emerge = false, // a stitch that has not had its turn is not there at all
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -783,6 +782,10 @@ export function drawLoose(ctx, items, o) {
     // linear, and by default everything moves together: the point is that each
     // frame is the whole set a step closer, not a scatter of arrival times
     const e = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
+    if (emerge) {
+      if (e <= 0) continue;        // not grown yet
+      it.grow = 0.25 + 0.75 * e;   // and it opens out as it comes
+    }
     let x, y;
     if (path === "manhattan") {
       const ex = Math.min(1, e * 2), ey = Math.max(0, e * 2 - 1);
@@ -816,10 +819,18 @@ export function drawLoose(ctx, items, o) {
   for (let l = 1; l <= levels; l++) {
     const bucket = buckets[l];
     if (!bucket.length) continue;
-    const lsize = size * (1 - swell * (1 - l / levels));
-    const off = (size - lsize) / 2;
-    paintLevel(ctx, bucket.length, (i) => [bucket[i].x + off, bucket[i].y + off],
-      lsize, { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed }, l / levels);
+    const paintOpts = { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
+    // Each stitch at the size its own cell asks for — the same rule the still
+    // panel uses. Sizing these by their level instead left the two disagreeing,
+    // so a gather never quite landed on the picture it came from.
+    const at = (i) => {
+      const it = bucket[i];
+      let sz = size * (1 - swell * (1 - (it.w ?? 1)));
+      if (emerge) sz *= it.grow ?? 1;
+      const k = (size - sz) / 2;
+      return [it.x + k, it.y + k, sz];
+    };
+    paintLevel(ctx, bucket.length, at, size, paintOpts, 1);
   }
   ctx.globalAlpha = 1;
 }
