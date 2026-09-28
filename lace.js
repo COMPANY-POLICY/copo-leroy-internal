@@ -783,18 +783,18 @@ export function drawLoose(ctx, items, o) {
 // the levels collapse to solid. Set Levels to 1 and the canvas shows exactly
 // what the file will be.
 export function toSVG(grid, o) {
-  const { ink = "#2fe36a", shape = "square", w, h,
+  const { ink = "#2fe36a", shape = "square", w, h, bg = null, soft = 0, relief = 0,
     swell = 0, scatter = 0, vary = 0, printSeed = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   const n = (v) => Math.round(v * 100) / 100;
-  const d = [];
 
-  // The same geometry the canvas draws — swell, scatter, vary and the offset —
-  // worked out again here rather than taken from the canvas, so the file is the
-  // arrangement and not a trace of it. Relief cannot come along: one path
-  // carries one fill, and its lit and shaded copies are other colours.
-  const mark = (x, y, sz) => {
+  // Mirrors what the canvas paints, level by level, rather than flattening it:
+  // a file that does not match the picture it came from is not much use. Tone
+  // needs an opacity per level and relief needs its own colours, so it is a
+  // handful of paths rather than one. Grain and mottle cannot come — they are
+  // per-pixel noise, and vector has nowhere to put them.
+  const mark = (d, x, y, sz) => {
     const r = n(sz / 2), s2 = n(sz), X = n(x), Y = n(y);
     if (shape === "dot") {
       d.push(`M${X} ${n(y + sz / 2)}a${r} ${r} 0 1 0 ${s2} 0a${r} ${r} 0 1 0 ${n(-sz)} 0z`);
@@ -807,10 +807,17 @@ export function toSVG(grid, o) {
     }
   };
 
+  const body = [];
   for (let l = 1; l <= levels; l++) {
+    const cells = byLevel[l];
+    if (!cells.length) continue;
+    const alpha = l / levels;
     const lsize = size * (1 - swell * (1 - l / levels));
     const loff = (size - lsize) / 2;
-    for (const [px, py] of byLevel[l]) {
+
+    // where each stitch of this level ends up, and how big it is
+    const placed = [];
+    for (const [px, py] of cells) {
       const base = [px + loff, py + loff];
       const c = scatter > 0 ? nudge(base[0], base[1], scatter, printSeed) : base;
       const p = nudge(c[0], c[1], offset, offsetSeed);
@@ -818,19 +825,43 @@ export function toSVG(grid, o) {
         ? lsize * (1 + (hash01(px, py, printSeed ^ 0x9e37) * 2 - 1) * vary)
         : lsize;
       const k = (lsize - sz) / 2;
-      mark(p[0] + k, p[1] + k, sz);
-      if (speckle > 0) {
+      placed.push([p[0] + k, p[1] + k, sz]);
+    }
+
+    const layer = (dx, dy, colour, a) => {
+      const d = [];
+      for (const [x, y, sz] of placed) mark(d, x + dx, y + dy, sz);
+      body.push(`<path fill="${colour}" fill-opacity="${n(a)}" d="${d.join("")}"/>`);
+    };
+    if (relief > 0) {
+      const dd = lsize * 0.34 * relief;
+      layer(-dd, -dd, mix(ink, 255, 0.45), alpha * 0.55 * relief);
+      layer(dd, dd, mix(ink, 0, 0.5), alpha * 0.7 * relief);
+    }
+    layer(0, 0, ink, alpha);
+
+    if (speckle > 0) {
+      const d = [];
+      for (const [x, y] of placed) {
         for (let q = 0; q < 3; q++) {
-          const sp = nudge(p[0] + q * 37, p[1] - q * 53, lsize * 2.2 * speckle, speckleSeed + q * 911);
-          mark(sp[0], sp[1], lsize * (0.12 + 0.16 * ((q * 7) % 3) / 2));
+          const sp = nudge(x + q * 37, y - q * 53, lsize * 2.2 * speckle, speckleSeed + q * 911);
+          mark(d, sp[0], sp[1], lsize * (0.12 + 0.16 * ((q * 7) % 3) / 2));
         }
       }
+      body.push(`<path fill="${ink}" fill-opacity="${n(alpha * 0.55)}" d="${d.join("")}"/>`);
     }
   }
 
-  return [
+  const out = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">`,
-    `<path fill="${ink}" d="${d.join("")}"/>`,
-    "</svg>",
-  ].join("\n");
+  ];
+  if (soft > 0) {
+    // canvas blur(Npx) is a gaussian of standard deviation N, same as this
+    out.push(`<defs><filter id="soft" x="-5%" y="-5%" width="110%" height="110%">` +
+      `<feGaussianBlur stdDeviation="${n(soft)}"/></filter></defs>`);
+  }
+  if (bg) out.push(`<rect width="${n(w)}" height="${n(h)}" fill="${bg}"/>`);
+  out.push(soft > 0 ? `<g filter="url(#soft)">${body.join("")}</g>` : body.join("\n"));
+  out.push("</svg>");
+  return out.join("\n");
 }

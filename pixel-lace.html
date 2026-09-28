@@ -1177,6 +1177,9 @@ $("saveSvg").addEventListener("click", () => {
     swell: S.swell, scatter: S.scatter * (S.w / grid.cols), vary: S.vary,
     printSeed: S.seed, offset: S.offset * (S.w / grid.cols), offsetSeed: 0,
     speckle: S.speckle, speckleSeed: S.seed,
+    // match what is on screen: the ground unless it is transparent, the
+    // relief, and the softness as a blur of the same radius
+    bg: S.alpha ? null : S.bg, relief: S.relief, soft: S.soft,
   });
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   download(url, `pixel-lace-${S.w}x${S.h}.svg`);

@@ -200,28 +200,17 @@ woven look: the grid decides what survives, the way a weave does.
   is held rather than tweened — it is stop motion, and `Frames per second` sets
   how choppy. `Record 5s` captures the canvas to mp4 where the browser supports
   it, webm otherwise.
-- **Save PNG / Save SVG** — the SVG works the geometry out again rather than
-  tracing the canvas, so swell, scatter, vary, the offset and the speckle all
-  carry into it; against the canvas it differs by 2.7% of pixels where 2.6% is
-  the anti-aliasing baseline with all of them off. Relief cannot come along —
-  one path carries one fill and its lit and shaded copies are other colours —
-  and neither can grain, mottle or softness, which are raster effects. The SVG
-  is the same stitches as vector, flattened:
-  every stitch in one compound path on a transparent ground, so the file
-  arrives as a single object to place, recolour or cut. Tone cannot survive
-  that — one path carries one fill — so the levels collapse to solid. Set
-  `Levels` to 1 and the canvas shows exactly what the file will be.
-- **Riso** — a duplicator lays ink unevenly, on absorbent stock: `Grain` is the
-  fine speckle over everything, ink and ground alike, laid on as departures
-  from mid grey so some specks lift and some sink; `Mottle` is the broad
-  patchiness of a drum that carried more ink in one place than another, drawn
-  small and scaled up so the interpolation does the softening; `Speckle` is the
-  ink that did not quite make it onto the mark — keyed to the print rather than
-  to the frame, so specks travel with their stitch instead of re-rolling every
-  frame and setting the whole ground crawling. `Offset` is the only part that
-  moves on its own. With `Offset` for the
-  misregistration, those four are most of what reads as riso over a clean
-  print.
+- **Save PNG / Save SVG** — the SVG mirrors what the canvas paints rather than
+  flattening it, and works the geometry out again rather than tracing it: the
+  ground, the tonal levels as an opacity each, relief as its own colours, swell,
+  scatter, vary, the offset, the speckle, and softness as a blur of the same
+  radius. Rendered back and compared with the canvas over the same ground it
+  differs by 0% of pixels with a transparent ground and 2.6% with an opaque one,
+  which is the anti-aliasing between the two rasterisers. It costs about a dozen
+  paths rather than one; `Levels` 1 with `Relief` 0 still gives a single path.
+  `Grain` and `Mottle` are the exception and simply are not there — they are
+  per-pixel noise and vector has nowhere to put them, so a panel leaning on them
+  will read cleaner as an SVG than as a PNG.
 - **Transparent ground** — drops the panel colour so the PNG exports as the
   lace alone, to lay over a photograph or a product shot. The lower tonal
   levels stay semi-transparent, which is what you want over a busy ground.
