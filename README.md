@@ -204,7 +204,10 @@ woven look: the grid decides what survives, the way a weave does.
   from mid grey so some specks lift and some sink; `Mottle` is the broad
   patchiness of a drum that carried more ink in one place than another, drawn
   small and scaled up so the interpolation does the softening; `Speckle` is the
-  ink that did not quite make it onto the mark. With `Offset` for the
+  ink that did not quite make it onto the mark — keyed to the print rather than
+  to the frame, so specks travel with their stitch instead of re-rolling every
+  frame and setting the whole ground crawling. `Offset` is the only part that
+  moves on its own. With `Offset` for the
   misregistration, those four are most of what reads as riso over a clean
   print.
 - **Transparent ground** — drops the panel colour so the PNG exports as the

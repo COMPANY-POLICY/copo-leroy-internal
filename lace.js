@@ -604,7 +604,8 @@ export function stitchShape(ctx, x, y, size, shape) {
 // top. `at` hands back each position so both the still and the moving stitches
 // can use it.
 function paintLevel(ctx, count, at, size, o, alpha) {
-  const { ink, shape, relief = 0, offset = 0, offsetSeed = 0, speckle = 0 } = o;
+  const { ink, shape, relief = 0, offset = 0, offsetSeed = 0,
+    speckle = 0, speckleSeed = 0 } = o;
   const run = (dx, dy, colour, a) => {
     ctx.globalAlpha = a;
     ctx.fillStyle = colour;
@@ -631,7 +632,10 @@ function paintLevel(ctx, count, at, size, o, alpha) {
     for (let i = 0; i < count; i++) {
       const p = at(i);
       for (let k = 0; k < 3; k++) {
-        const n = nudge(p[0] + k * 37, p[1] - k * 53, size * 2.2 * speckle, offsetSeed + k * 911);
+        // keyed to the print, not the frame: specks are part of the mark and
+        // travel with it, where re-rolling them every frame set the whole
+        // ground crawling
+        const n = nudge(p[0] + k * 37, p[1] - k * 53, size * 2.2 * speckle, speckleSeed + k * 911);
         const d = size * (0.12 + 0.16 * ((k * 7 + i) % 3) / 2);
         ctx.rect(n[0], n[1], d, d);
       }
@@ -680,7 +684,7 @@ export function stitchCells(grid, o) {
 
 export function drawStitches(ctx, grid, o) {
   const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
-    offset = 0, offsetSeed = 0, speckle = 0 } = o;
+    offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   for (let l = 1; l <= levels; l++) {
     const cells = byLevel[l];
@@ -689,7 +693,7 @@ export function drawStitches(ctx, grid, o) {
     const lsize = size * (1 - swell * (1 - l / levels));
     const off = (size - lsize) / 2;
     paintLevel(ctx, cells.length, (i) => [cells[i][0] + off, cells[i][1] + off],
-      lsize, { ink, shape, relief, offset, offsetSeed, speckle }, l / levels);
+      lsize, { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed }, l / levels);
   }
   ctx.globalAlpha = 1;
 }
@@ -704,7 +708,7 @@ export function drawLoose(ctx, items, o) {
     cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
     path = "line",  // "manhattan" turns a corner: across first, then down
     loosen = 0,     // over the last of the run, let them off the lattice again
-    relief = 0, swell = 0, offset = 0, offsetSeed = 0,
+    relief = 0, swell = 0, offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -749,7 +753,7 @@ export function drawLoose(ctx, items, o) {
     const lsize = size * (1 - swell * (1 - l / levels));
     const off = (size - lsize) / 2;
     paintLevel(ctx, bucket.length, (i) => [bucket[i].x + off, bucket[i].y + off],
-      lsize, { ink, shape, relief, offset, offsetSeed }, l / levels);
+      lsize, { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed }, l / levels);
   }
   ctx.globalAlpha = 1;
 }
