@@ -898,10 +898,9 @@ export function drawLoose(ctx, items, o) {
     // linear, and by default everything moves together: the point is that each
     // frame is the whole set a step closer, not a scatter of arrival times
     const e = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
-    if (emerge) {
-      if (e <= 0) continue;        // not grown yet
-      it.grow = 0.25 + 0.75 * e;   // and it opens out as it comes
-    }
+    // A growing stitch is simply there or it is not: no easing in, by size or
+    // by opacity. Something dividing appears whole.
+    if (emerge && e <= 0) continue;
     let x, y;
     if (path === "manhattan") {
       const ex = Math.min(1, e * 2), ey = Math.max(0, e * 2 - 1);
@@ -941,8 +940,7 @@ export function drawLoose(ctx, items, o) {
     // so a gather never quite landed on the picture it came from.
     const at = (i) => {
       const it = bucket[i];
-      let sz = size * (1 - swell * (1 - (it.w ?? 1)));
-      if (emerge) sz *= it.grow ?? 1;
+      const sz = size * (1 - swell * (1 - (it.w ?? 1)));
       const k = (size - sz) / 2;
       return [it.x + k, it.y + k, sz];
     };

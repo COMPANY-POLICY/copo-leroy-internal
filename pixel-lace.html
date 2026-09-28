@@ -602,11 +602,35 @@ function branchStitches() {
     S.w, S.h].join("|");
   if (branched && branched.key === key) return branched;
   const { byLevel, size, levels } = stitchCells(grid, drawOpts());
-  // when growth reaches each cell, spreading through the ink at an uneven rate
-  const fld = growthField(grid, {
-    ink: Math.max(0.06, S.threshold * 0.6), seed: S.seed, roughness: 1,
-  }).field;
   const { cols, rows } = grid;
+  // When growth spreading through the ink would reach each cell, against how
+  // far out the cell simply lies. On the spread alone a cell sitting in slow
+  // ground near the middle can be reached after one far out, so the order
+  // stops being outward at all — it expands and then fills back in towards the
+  // centre. Weighted towards distance, it stays an outward growth, and the
+  // spread is what makes its edge ragged rather than a ring.
+  // Three things decide when a cell's turn comes, and it takes all three.
+  // Plain distance out from the middle is the only one that guarantees the
+  // growth reads as outward: measured through the shape instead, an arm that
+  // loops back can be a long way round while sitting close to the centre, and
+  // the run expands and then fills back in behind itself. Distance through the
+  // shape keeps it following the arms rather than sweeping a circle over them,
+  // and the spread is what leaves the edge ragged instead of a ring.
+  const ink = Math.max(0.06, S.threshold * 0.6);
+  const along = shapeField(grid, { ink }).field;
+  const spread = growthField(grid, { ink, seed: S.seed, roughness: 1 }).field;
+  const fld = new Float32Array(along.length);
+  {
+    const midX = (cols - 1) / 2, midY = (rows - 1) / 2;
+    const maxR = Math.hypot(midX, midY) || 1;
+    for (let ry = 0; ry < rows; ry++) {
+      for (let rx = 0; rx < cols; rx++) {
+        const i = ry * cols + rx;
+        const radial = Math.hypot(rx - midX, ry - midY) / maxR;
+        fld[i] = radial * 0.5 + along[i] * 0.25 + spread[i] * 0.25;
+      }
+    }
+  }
   const cw = S.w / cols, ch = S.h / rows;
   const items = [];
   for (let l = 1; l <= levels; l++) {

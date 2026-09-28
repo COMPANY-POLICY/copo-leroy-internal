@@ -150,16 +150,23 @@ woven look: the grid decides what survives, the way a weave does.
   stitches redraw in about one. What changes is which cells clear the
   threshold — with two exceptions, which move the stitches themselves.
 
-  `branch` grows the pattern out of its middle and leaves it there. Each
-  stitch's turn is when growth spreading through the ink would reach it — a
-  shortest walk out from the densest point — and it comes out of whichever
-  neighbouring cell lies closer in, so an arm extends along itself rather than
-  every stitch sliding in from one direction. The spread crosses ground that is
-  slow or quick in patches, which is what gives it fingers: cells the same
-  distance through the shape are reached across 0.16 of the run rather than
-  0.03. Independent noise per step will not do it — a shortest path routes
-  around any one slow cell and the front comes back smooth. `Amount` is how long
-  the grown symbol holds before starting over.
+  `branch` grows the pattern out of its middle and leaves it there. A stitch is
+  simply present or absent — nothing eases in, by size or by opacity, because
+  something dividing appears whole — and it comes out of whichever neighbouring
+  cell lies closer to the middle, so an arm extends along itself rather than
+  every stitch sliding in from one direction.
+
+  Its turn is decided by three things together. Plain distance out from the
+  middle is the only one that guarantees the growth reads as outward: measured
+  through the shape instead, an arm that loops back can be a long way round
+  while sitting close to the centre, and the run expands and then fills in
+  behind itself. Distance through the shape keeps it following the arms rather
+  than sweeping a circle over them. And a spread — a shortest walk across ground
+  that is slow or quick in patches — is what leaves the edge ragged instead of a
+  ring; independent noise per step will not do it, since a shortest path routes
+  around any one slow cell and the front comes back smooth. Mean radius runs
+  65px to 698px over the run, with 23px to 119px of raggedness at each stage.
+  `Amount` is how long the grown symbol holds before starting over.
 
   `gather` moves the stitches themselves. They
   wait in an even grid across the panel and are then arranged into the pattern
