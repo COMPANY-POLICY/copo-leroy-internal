@@ -742,8 +742,14 @@ function frameFor(n) {
   // seconds, not frames — so fps changes how choppy it is, not how fast
   const t = n / Math.max(1, S.fps);
   switch (S.motion) {
-    case "breathe":
-      return waveFrame(t, (cov, t) => Math.sin(t * 2.2) * amt * 0.22);
+    case "breathe": {
+      // Moves the threshold, not the coverage. Threshold is a floor that the
+      // surviving values are stretched back over, so shifting it lifts and
+      // sinks the whole field — every stitch changes weight, not just the ones
+      // at the edge. Adding to coverage instead only wobbled the outline.
+      const swing = Math.sin(t * 1.6);
+      return { threshold: Math.max(0.02, Math.min(0.95, S.threshold - swing * amt * 0.25)) };
+    }
     case "gather": {
       // Counted in frames rather than seconds: one step per frame, so Steps is
       // exactly how many stages there are and each one is a legible position.
