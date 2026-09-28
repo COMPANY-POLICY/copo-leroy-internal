@@ -621,15 +621,16 @@ function paintLevel(ctx, count, at, size, o, alpha) {
     ctx.beginPath();
     for (let i = 0; i < count; i++) {
       const p = at(i);
+      const base = p[2] ?? size;
       // off its cell for good, then off that again for this frame
       const c = scatter > 0 ? nudge(p[0], p[1], scatter, printSeed) : p;
       const n = nudge(c[0], c[1], offset, offsetSeed);
       // and no two quite the same size, which is what stops a field of them
       // reading as a grid however far they are moved off one
       const sz = vary > 0
-        ? size * (1 + (hash01(p[0], p[1], printSeed ^ 0x9e37) * 2 - 1) * vary)
-        : size;
-      const k = (size - sz) / 2; // grown or shrunk about its own middle
+        ? base * (1 + (hash01(p[0], p[1], printSeed ^ 0x9e37) * 2 - 1) * vary)
+        : base;
+      const k = (base - sz) / 2; // grown or shrunk about its own middle
       stitchShape(ctx, n[0] + dx + k, n[1] + dy + k, sz, shape);
     }
     ctx.fill();
@@ -668,6 +669,10 @@ export function stitchCells(grid, o) {
   const {
     x = 0, y = 0, w, h, levels = 3, threshold = 0.5,
     contrast = 1, gap = 0.18, dither = 0.35, seed = 7,
+    // what a stitch's size is taken from. Motion changes which cells are lit
+    // and how strongly, but a stitch that grows or shrinks between frames reads
+    // as one that moved, so size comes from the still composition and stays put.
+    sizeFrom = null,
   } = o;
   const cw = w / cols, ch = h / rows;
   const size = Math.min(cw, ch) * (1 - gap);
@@ -693,6 +698,7 @@ export function stitchCells(grid, o) {
       byLevel[Math.min(levels, lv)].push([
         x + rx * cw + (cw - size) / 2,
         y + ry * ch + (ch - size) / 2,
+        Math.max(0, Math.min(1, (sizeFrom ? sizeFrom[i] : cells[i]))),
       ]);
     }
   }
@@ -707,11 +713,13 @@ export function drawStitches(ctx, grid, o) {
   for (let l = 1; l <= levels; l++) {
     const cells = byLevel[l];
     if (!cells.length) continue;
-    // fainter levels sit smaller, so density reads as weight and not only as tone
-    const lsize = size * (1 - swell * (1 - l / levels));
-    const off = (size - lsize) / 2;
-    paintLevel(ctx, cells.length, (i) => [cells[i][0] + off, cells[i][1] + off],
-      lsize, { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed }, l / levels);
+    // a stitch's weight follows its own place in the pattern, not the level it
+    // happens to be lit at this moment — the level is what sets its opacity
+    paintLevel(ctx, cells.length, (i) => {
+      const lsize = size * (1 - swell * (1 - cells[i][2]));
+      const off = (size - lsize) / 2;
+      return [cells[i][0] + off, cells[i][1] + off, lsize];
+    }, size, { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed }, l / levels);
   }
   ctx.globalAlpha = 1;
 }
@@ -812,12 +820,12 @@ export function toSVG(grid, o) {
     const cells = byLevel[l];
     if (!cells.length) continue;
     const alpha = l / levels;
-    const lsize = size * (1 - swell * (1 - l / levels));
-    const loff = (size - lsize) / 2;
-
-    // where each stitch of this level ends up, and how big it is
+    // where each stitch of this level ends up, and how big it is — its weight
+    // follows its own place in the pattern, as on the canvas
     const placed = [];
-    for (const [px, py] of cells) {
+    for (const [px, py, cov] of cells) {
+      const lsize = size * (1 - swell * (1 - (cov ?? 1)));
+      const loff = (size - lsize) / 2;
       const base = [px + loff, py + loff];
       const c = scatter > 0 ? nudge(base[0], base[1], scatter, printSeed) : base;
       const p = nudge(c[0], c[1], offset, offsetSeed);
