@@ -111,6 +111,10 @@ woven look: the grid decides what survives, the way a weave does.
   cross), how many tonal levels, and dither, which breaks flat areas into
   stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
+  `Offset` nudges each stitch off its cell by an amount fixed for that cell and
+  that frame, so it re-rolls as it plays — printing that misses its register by
+  a hair is alive in a way a perfect grid is not, and it gives the stitches
+  something to do while the pattern itself holds still.
   `Relief` puts a lit copy behind each stitch and a shaded one under it, and
   `Swell` scales a stitch with how solid that part of the pattern is, so
   density reads as weight rather than only as tone — one flat colour at one
@@ -177,7 +181,15 @@ woven look: the grid decides what survives, the way a weave does.
   passing in a frame or two. `Flare` brightens cells as the front reaches them,
   so stitches gather along the edge of the change rather than the whole field
   dimming and lifting. With no images loaded it dissolves one
-  seed into the next instead. `Amount` is the hold in seconds there, and the
+  seed into the next instead.
+
+  `gather` takes a series too, and is the more physical way to do it: rather
+  than dissolving one picture's coverage into the next, the stitches of one
+  walk into the other's arrangement, under whichever `Transition` is chosen.
+  Two pictures rarely have the same number of stitches, so whichever is short
+  is padded with points just outside the frame — surplus stitches walk out of
+  shot and new ones walk in, which keeps both ends exactly their own
+  arrangement. `Amount` is the hold in seconds there, and the
   depth of the wave elsewhere. Each frame
   is held rather than tweened — it is stop motion, and `Frames per second` sets
   how choppy. `Record 5s` captures the canvas to mp4 where the browser supports

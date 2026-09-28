@@ -499,6 +499,20 @@ function mix(hex, to, t) {
   return `rgb(${r2},${g2},${b2})`;
 }
 
+// A stitch nudged off its cell, by an amount fixed for that cell and that
+// frame. Printing that misses its register by a hair is alive in a way a
+// perfect grid is not — and in motion it gives the stitches something to do
+// while the pattern itself holds still.
+export function nudge(x, y, amount, seed) {
+  if (!(amount > 0)) return [x, y];
+  let h = (Math.imul(Math.round(x) | 0, 374761393) ^ Math.imul(Math.round(y) | 0, 668265263)
+    ^ Math.imul(seed | 0, 2246822519)) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+  const a = (h >>> 8) / 16777216 * Math.PI * 2;
+  const r = ((h & 255) / 255) * amount;
+  return [x + Math.cos(a) * r, y + Math.sin(a) * r];
+}
+
 export function stitchShape(ctx, x, y, size, shape) {
   const r = size / 2;
   if (shape === "dot") {
@@ -515,14 +529,15 @@ export function stitchShape(ctx, x, y, size, shape) {
 // top. `at` hands back each position so both the still and the moving stitches
 // can use it.
 function paintLevel(ctx, count, at, size, o, alpha) {
-  const { ink, shape, relief = 0 } = o;
+  const { ink, shape, relief = 0, offset = 0, offsetSeed = 0 } = o;
   const run = (dx, dy, colour, a) => {
     ctx.globalAlpha = a;
     ctx.fillStyle = colour;
     ctx.beginPath();
     for (let i = 0; i < count; i++) {
       const p = at(i);
-      stitchShape(ctx, p[0] + dx, p[1] + dy, size, shape);
+      const n = nudge(p[0], p[1], offset, offsetSeed);
+      stitchShape(ctx, n[0] + dx, n[1] + dy, size, shape);
     }
     ctx.fill();
   };
@@ -573,7 +588,8 @@ export function stitchCells(grid, o) {
 }
 
 export function drawStitches(ctx, grid, o) {
-  const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0 } = o;
+  const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
+    offset = 0, offsetSeed = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   for (let l = 1; l <= levels; l++) {
     const cells = byLevel[l];
@@ -582,7 +598,7 @@ export function drawStitches(ctx, grid, o) {
     const lsize = size * (1 - swell * (1 - l / levels));
     const off = (size - lsize) / 2;
     paintLevel(ctx, cells.length, (i) => [cells[i][0] + off, cells[i][1] + off],
-      lsize, { ink, shape, relief }, l / levels);
+      lsize, { ink, shape, relief, offset, offsetSeed }, l / levels);
   }
   ctx.globalAlpha = 1;
 }
@@ -597,7 +613,7 @@ export function drawLoose(ctx, items, o) {
     cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
     path = "line",  // "manhattan" turns a corner: across first, then down
     loosen = 0,     // over the last of the run, let them off the lattice again
-    relief = 0, swell = 0,
+    relief = 0, swell = 0, offset = 0, offsetSeed = 0,
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -642,7 +658,7 @@ export function drawLoose(ctx, items, o) {
     const lsize = size * (1 - swell * (1 - l / levels));
     const off = (size - lsize) / 2;
     paintLevel(ctx, bucket.length, (i) => [bucket[i].x + off, bucket[i].y + off],
-      lsize, { ink, shape, relief }, l / levels);
+      lsize, { ink, shape, relief, offset, offsetSeed }, l / levels);
   }
   ctx.globalAlpha = 1;
 }

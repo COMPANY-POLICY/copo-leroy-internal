@@ -96,6 +96,8 @@
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
     <label><span>Levels <b id="v-levels"></b></span>
       <input id="levels" type="range" min="1" max="5" step="1" value="3" /></label>
+    <label><span>Offset <b id="v-offset"></b></span>
+      <input id="offset" type="range" min="0" max="1" step="0.05" value="0" /></label>
     <label><span>Relief <b id="v-relief"></b></span>
       <input id="relief" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
     <label><span>Swell <b id="v-swell"></b></span>
@@ -240,7 +242,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, offset: 0,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
@@ -317,6 +319,7 @@ function build() {
   grid = seqGrids.length ? seqGrids[0] : buildSource();
   orders.clear(); // the morph schedules go with the grids they described
   loose = null;
+  pairCache.clear();
   window.__grid = grid; // dev hook, alongside __S / __build / __draw
   const rows = grid.rows;
   const usingImage = S.source !== "motif" && S.image;
@@ -449,6 +452,7 @@ function draw(frame = null) {
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
       path: S.transition === "corner" ? "manhattan" : "line",
       loosen: 0.3, relief: S.relief, swell: S.swell,
+      offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
     });
   } else {
     drawStitches(g, frame?.grid || grid, {
@@ -456,6 +460,7 @@ function draw(frame = null) {
       threshold: frame?.threshold ?? S.threshold,
       contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither,
       seed: frame?.seed ?? S.seed, relief: S.relief, swell: S.swell,
+      offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
     });
   }
   compositeStitches(g);
@@ -468,6 +473,65 @@ let anim = { on: false, raf: 0, beat: 0, last: 0, tick: 0, morphB: null };
 
 function morphGrid(t) {
   return crossfade(grid, anim.morphB, t, "seed");
+}
+
+// One picture's stitches, matched to the next picture's. The two rarely have
+// the same number of them, so whichever is short is padded with points just
+// outside the frame: surplus stitches walk out of shot, new ones walk in. Both
+// ends stay exactly their own arrangement, which they would not if the extras
+// were parked somewhere inside the panel.
+const pairCache = new Map();
+function loosePair(i) {
+  const j = (i + 1) % seqGrids.length;
+  const key = `${i}>${j}|${S.cols}|${S.levels}|${S.gap}|${S.threshold}|${S.contrast}|${S.dither}|${S.seed}|${S.transition}|${S.w}x${S.h}`;
+  if (pairCache.has(key)) return pairCache.get(key);
+
+  const A = stitchCells(seqGrids[i], drawOpts());
+  const B = stitchCells(seqGrids[j], drawOpts());
+  const flat = (set) => {
+    const out = [];
+    for (let l = 1; l <= set.levels; l++) for (const p of set.byLevel[l]) out.push([p[0], p[1], l]);
+    return out;
+  };
+  const a = flat(A), b = flat(B);
+  const n = Math.max(a.length, b.length);
+  const rim = (k) => { // a point just outside the frame, spread around it
+    const u = (k * 2.399963) % (Math.PI * 2);
+    return [S.w / 2 + Math.cos(u) * S.w * 0.75, S.h / 2 + Math.sin(u) * S.h * 0.75];
+  };
+  while (a.length < n) { const r = rim(a.length); a.push([r[0], r[1], b[a.length][2]]); }
+  while (b.length < n) { const r = rim(b.length + 7919); b.push([r[0], r[1], a[b.length][2]]); }
+
+  const ORDER = 8, SIDE = 1 << ORDER;
+  const hilbert = (px, py) => {
+    let x = Math.max(0, Math.min(SIDE - 1, Math.floor((px / S.w) * SIDE)));
+    let y = Math.max(0, Math.min(SIDE - 1, Math.floor((py / S.h) * SIDE)));
+    let d = 0;
+    for (let sN = SIDE / 2; sN > 0; sN /= 2) {
+      const rx = (x & sN) > 0 ? 1 : 0, ry = (y & sN) > 0 ? 1 : 0;
+      d += sN * sN * ((3 * rx) ^ ry);
+      if (ry === 0) { if (rx === 1) { x = sN - 1 - x; y = sN - 1 - y; } const t = x; x = y; y = t; }
+    }
+    return d;
+  };
+  const rnd = (() => { let z = 0x1234567 ^ S.seed; return () => (z = (z * 1664525 + 1013904223) >>> 0) / 4294967296; })();
+  const orderOf = (list) => {
+    const idx = list.map((_, k) => k);
+    if (S.transition === "swap") { // paired at random, for comparison
+      for (let k = idx.length - 1; k > 0; k--) { const m = Math.floor(rnd() * (k + 1)); [idx[k], idx[m]] = [idx[m], idx[k]]; }
+      return idx;
+    }
+    return idx.sort((p, q) => hilbert(list[p][0], list[p][1]) - hilbert(list[q][0], list[q][1]));
+  };
+  const oa = orderOf(a), ob = orderOf(b);
+  const items = [];
+  for (let k = 0; k < n; k++) {
+    const from = a[oa[k]], to = b[ob[k]];
+    items.push({ sx: from[0], sy: from[1], tx: to[0], ty: to[1], level: to[2], delay: 0, x: to[0], y: to[1] });
+  }
+  const out = { key, items, size: B.size, levels: B.levels };
+  pairCache.set(key, out);
+  return out;
 }
 
 // The stitches of the still composition, each given somewhere to come in from
@@ -623,6 +687,12 @@ function waveFrame(t, fn) {
 }
 
 function frameAt(n) {
+  const f = frameFor(n);
+  // every frame carries its own tick, so the offset re-rolls as it plays
+  return f ? { ...f, tick: n } : (S.offset > 0 ? { tick: n } : null);
+}
+
+function frameFor(n) {
   const amt = S.amount;
   // seconds, not frames — so fps changes how choppy it is, not how fast
   const t = n / Math.max(1, S.fps);
@@ -631,12 +701,31 @@ function frameAt(n) {
       return waveFrame(t, (cov, t) => Math.sin(t * 2.2) * amt * 0.22);
     case "gather": {
       // Counted in frames rather than seconds: one step per frame, so Steps is
-      // exactly how many stages there are between the grid and the pattern and
-      // each one is a legible position. Frames per second sets how long each is
-      // held.
-      const g = looseStitches();
+      // exactly how many stages there are and each one is a legible position.
+      // Frames per second sets how long each is held.
       const steps = Math.max(2, Math.round(S.steps));
       const hold = Math.max(1, Math.round((0.4 + amt * 3) * S.fps));
+      // Eased a little, so the steps close up towards each end rather than
+      // arriving at full stride. Short late steps are not lost to the lattice —
+      // drawLoose eases off it over the last of the run.
+      const shape = (step) => {
+        const u = step / steps;
+        return 1 - Math.pow(1 - u, 1.55);
+      };
+
+      if (seqGrids.length > 1) {
+        // A series walks one picture's stitches into the next and on to the
+        // one after, so each leg is a journey and a hold — there is nothing to
+        // come back out to, the way there is with a single pattern.
+        const leg = steps + hold;
+        const total = leg * seqGrids.length;
+        const k = ((n % total) + total) % total;
+        const i = Math.floor(k / leg);
+        const step = Math.min(steps, k % leg);
+        return { loose: loosePair(i), phase: shape(step) };
+      }
+
+      const g = looseStitches();
       const cycle = steps * 2 + hold * 2;
       const k = ((n % cycle) + cycle) % cycle;
       let step;
@@ -644,12 +733,7 @@ function frameAt(n) {
       else if (k < steps + hold) step = steps;                   // arranged
       else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // opening out
       else step = 0;                                             // back in the grid
-      // Eased a little, so the steps close up towards each end rather than
-      // arriving at full stride. The same easing runs in reverse on the way
-      // out, so it leaves gently too. Short late steps are no longer lost to
-      // the lattice — drawLoose eases off it over the last of the run.
-      const u = step / steps;
-      return { loose: g, phase: 1 - Math.pow(1 - u, 1.55) };
+      return { loose: g, phase: shape(step) };
     }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, t) => Math.sin(t * 2 - cov * 7) * amt * 0.3);
@@ -724,6 +808,7 @@ const SLIDERS = [
   ["steps", "steps", true],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
   ["soft", "soft", true, f2], ["relief", "relief", true, f2], ["swell", "swell", true, f2],
+  ["offset", "offset", true, f2],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
   ["contrast", "contrast", true, (v) => v.toFixed(1)],
   ["stems", "stems", false], ["spread", "spread", false, f2],
@@ -772,7 +857,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell"];
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "offset"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
