@@ -96,6 +96,8 @@
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
     <label><span>Levels <b id="v-levels"></b></span>
       <input id="levels" type="range" min="1" max="5" step="1" value="3" /></label>
+    <label><span>Softness <b id="v-soft"></b></span>
+      <input id="soft" type="range" min="0" max="3" step="0.1" value="0.8" /></label>
     <label><span>Dither <b id="v-dither"></b></span>
       <input id="dither" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
     <label><select id="shape">
@@ -234,7 +236,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square",
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
@@ -398,6 +400,33 @@ function drawOpts() {
   };
 }
 
+// Stitches go to their own layer and are composited through a blur when
+// softness is on: feathering the layer once is a single filtered draw, where
+// softening every stitch as it is drawn would not be. The ground underneath
+// stays crisp.
+let softLayer = null;
+function stitchTarget() {
+  if (!(S.soft > 0)) return ctx;
+  if (!softLayer) softLayer = document.createElement("canvas");
+  if (softLayer.width !== stage.width || softLayer.height !== stage.height) {
+    softLayer.width = stage.width;
+    softLayer.height = stage.height;
+  }
+  const g = softLayer.getContext("2d");
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, softLayer.width, softLayer.height);
+  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  return g;
+}
+function compositeStitches(g) {
+  if (g === ctx) return;
+  ctx.save();
+  ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  ctx.filter = `blur(${S.soft}px)`;
+  ctx.drawImage(softLayer, 0, 0, S.w, S.h);
+  ctx.restore();
+}
+
 function draw(frame = null) {
   ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
   ctx.clearRect(0, 0, S.w, S.h);
@@ -407,23 +436,25 @@ function draw(frame = null) {
     ctx.fillRect(0, 0, S.w, S.h);
   }
   if (!grid) return;
+  const g = stitchTarget();
   if (frame?.loose) {
     const cw = S.w / grid.cols, ch = S.h / grid.rows;
-    drawLoose(ctx, frame.loose.items, {
+    drawLoose(g, frame.loose.items, {
       ink: S.ink, shape: S.shape, size: frame.loose.size,
       levels: frame.loose.levels, phase: frame.phase,
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
       path: S.transition === "corner" ? "manhattan" : "line",
       loosen: 0.3,
     });
-    return;
+  } else {
+    drawStitches(g, frame?.grid || grid, {
+      w: S.w, h: S.h, ink: S.ink, levels: S.levels,
+      threshold: frame?.threshold ?? S.threshold,
+      contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither,
+      seed: frame?.seed ?? S.seed,
+    });
   }
-  drawStitches(ctx, frame?.grid || grid, {
-    w: S.w, h: S.h, ink: S.ink, levels: S.levels,
-    threshold: frame?.threshold ?? S.threshold,
-    contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither,
-    seed: frame?.seed ?? S.seed,
-  });
+  compositeStitches(g);
 }
 
 // Motion works on the grid, never on the motif: re-running the vector work per
@@ -688,6 +719,7 @@ const SLIDERS = [
   ["fps", "fps", true], ["amount", "amount", true, f2], ["flare", "flare", true, f2],
   ["steps", "steps", true],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
+  ["soft", "soft", true, f2],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
   ["contrast", "contrast", true, (v) => v.toFixed(1)],
   ["stems", "stems", false], ["spread", "spread", false, f2],
@@ -736,7 +768,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h"];
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;

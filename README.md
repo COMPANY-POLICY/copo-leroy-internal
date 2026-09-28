@@ -107,6 +107,9 @@ woven look: the grid decides what survives, the way a weave does.
   cross), how many tonal levels, and dither, which breaks flat areas into
   stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
+  `Softness` feathers the stitches: they are drawn to their own layer and
+  composited through a blur, so the edges come off hard-cut while the ground
+  underneath stays clean. It is a raster effect — the SVG export stays crisp.
 - **Border** — bands and corner scrolls. The motif is composed into the field
   the border encloses and clipped to it, so the frame reads as a frame; widen
   the border and the pattern tightens with it. A dropped image is placed in that
