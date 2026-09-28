@@ -636,13 +636,13 @@ function paintLevel(ctx, count, at, size, o, alpha) {
     ctx.fill();
   };
   if (relief > 0) {
-    // The bevel does not follow the level. Scaled by it, a stitch changing
-    // level shifted the weight between its lit and shaded copies, moving its
-    // centre of mass — a field of them reads as movement, though not one has
-    // moved. It is the same light on every stitch whatever it is lit at.
+    // The bevel fades with the stitch it belongs to. Held at a fixed strength
+    // while the ink dims, the two offset copies come to outweigh it and the
+    // mark's centre slides towards the shaded one — which looks exactly like
+    // the stitch moving. Scaled together, the mark only ever gets fainter.
     const d = size * 0.34 * relief;
-    run(-d, -d, mix(ink, 255, 0.45), 0.5 * relief); // lit from the top left
-    run(d, d, mix(ink, 0, 0.5), 0.62 * relief);
+    run(-d, -d, mix(ink, 255, 0.45), alpha * 0.55 * relief); // lit from the top left
+    run(d, d, mix(ink, 0, 0.5), alpha * 0.7 * relief);
   }
   run(0, 0, ink, alpha);
 
@@ -881,10 +881,10 @@ export function toSVG(grid, o) {
       body.push(`<path fill="${colour}" fill-opacity="${n(a)}" d="${d.join("")}"/>`);
     };
     if (relief > 0) {
-      // the same light on every stitch, as on the canvas
+      // fades with the stitch, as on the canvas
       const dd = size * 0.34 * relief;
-      layer(-dd, -dd, mix(ink, 255, 0.45), 0.5 * relief);
-      layer(dd, dd, mix(ink, 0, 0.5), 0.62 * relief);
+      layer(-dd, -dd, mix(ink, 255, 0.45), alpha * 0.55 * relief);
+      layer(dd, dd, mix(ink, 0, 0.5), alpha * 0.7 * relief);
     }
     layer(0, 0, ink, alpha);
 
