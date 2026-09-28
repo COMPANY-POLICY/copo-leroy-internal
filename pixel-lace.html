@@ -96,6 +96,10 @@
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
     <label><span>Levels <b id="v-levels"></b></span>
       <input id="levels" type="range" min="1" max="5" step="1" value="3" /></label>
+    <label><span>Relief <b id="v-relief"></b></span>
+      <input id="relief" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
+    <label><span>Swell <b id="v-swell"></b></span>
+      <input id="swell" type="range" min="0" max="0.8" step="0.05" value="0.3" /></label>
     <label><span>Softness <b id="v-soft"></b></span>
       <input id="soft" type="range" min="0" max="3" step="0.1" value="0.8" /></label>
     <label><span>Dither <b id="v-dither"></b></span>
@@ -236,7 +240,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
   stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
@@ -444,14 +448,14 @@ function draw(frame = null) {
       levels: frame.loose.levels, phase: frame.phase,
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
       path: S.transition === "corner" ? "manhattan" : "line",
-      loosen: 0.3,
+      loosen: 0.3, relief: S.relief, swell: S.swell,
     });
   } else {
     drawStitches(g, frame?.grid || grid, {
       w: S.w, h: S.h, ink: S.ink, levels: S.levels,
       threshold: frame?.threshold ?? S.threshold,
       contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither,
-      seed: frame?.seed ?? S.seed,
+      seed: frame?.seed ?? S.seed, relief: S.relief, swell: S.swell,
     });
   }
   compositeStitches(g);
@@ -719,7 +723,7 @@ const SLIDERS = [
   ["fps", "fps", true], ["amount", "amount", true, f2], ["flare", "flare", true, f2],
   ["steps", "steps", true],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
-  ["soft", "soft", true, f2],
+  ["soft", "soft", true, f2], ["relief", "relief", true, f2], ["swell", "swell", true, f2],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
   ["contrast", "contrast", true, (v) => v.toFixed(1)],
   ["stems", "stems", false], ["spread", "spread", false, f2],
@@ -768,7 +772,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft"];
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;

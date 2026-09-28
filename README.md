@@ -14,8 +14,12 @@ No dependencies, canvas 2D.
 ## Run
 
 ```bash
-python3 -m http.server 5188
+python3 serve.py 5189
 ```
+
+`serve.py` is `http.server` with caching turned off. Left on, a browser holds
+on to modules like `lace.js`, and a reload can leave a fresh page running stale
+code — which looks exactly like a change that did not work.
 
 Then open <http://127.0.0.1:5188/>. The demo page mounts the engine full-bleed
 with a control panel; `Auto` drives it along a self-crossing demo path so it
@@ -107,7 +111,10 @@ woven look: the grid decides what survives, the way a weave does.
   cross), how many tonal levels, and dither, which breaks flat areas into
   stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
-  `Softness` feathers the stitches: they are drawn to their own layer and
+  `Relief` puts a lit copy behind each stitch and a shaded one under it, and
+  `Swell` scales a stitch with how solid that part of the pattern is, so
+  density reads as weight rather than only as tone — one flat colour at one
+  size is what makes a panel read as a swatch. `Softness` feathers the stitches: they are drawn to their own layer and
   composited through a blur, so the edges come off hard-cut while the ground
   underneath stays clean. It is a raster effect — the SVG export stays crisp.
 - **Border** — bands and corner scrolls. The motif is composed into the field

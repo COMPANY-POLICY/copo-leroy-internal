@@ -486,6 +486,54 @@ export function shapeField(grid, o = {}) {
   return { field, max };
 }
 
+// --- relief -----------------------------------------------------------------
+// A flat fill of one colour at one size reads as a swatch. Two things give a
+// stitch body: its size following how solid that part of the pattern is, and a
+// shaded copy under it with a lit one behind, which is what turns a square into
+// something sitting on the ground rather than printed onto it.
+function mix(hex, to, t) {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+  const r2 = Math.round(r + (to - r) * t), g2 = Math.round(g + (to - g) * t), b2 = Math.round(b + (to - b) * t);
+  return `rgb(${r2},${g2},${b2})`;
+}
+
+export function stitchShape(ctx, x, y, size, shape) {
+  const r = size / 2;
+  if (shape === "dot") {
+    ctx.moveTo(x + size, y + r);
+    ctx.arc(x + r, y + r, r, 0, Math.PI * 2);
+  } else if (shape === "cross") {
+    const t = size * 0.34;
+    ctx.rect(x, y + (size - t) / 2, size, t);
+    ctx.rect(x + (size - t) / 2, y, t, size);
+  } else ctx.rect(x, y, size, size);
+}
+
+// Paints one level: the lit copy behind, the shaded copy under, the stitch on
+// top. `at` hands back each position so both the still and the moving stitches
+// can use it.
+function paintLevel(ctx, count, at, size, o, alpha) {
+  const { ink, shape, relief = 0 } = o;
+  const run = (dx, dy, colour, a) => {
+    ctx.globalAlpha = a;
+    ctx.fillStyle = colour;
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const p = at(i);
+      stitchShape(ctx, p[0] + dx, p[1] + dy, size, shape);
+    }
+    ctx.fill();
+  };
+  if (relief > 0) {
+    const d = size * 0.34 * relief;
+    run(-d, -d, mix(ink, 255, 0.45), alpha * 0.55 * relief); // lit from the top left
+    run(d, d, mix(ink, 0, 0.5), alpha * 0.7 * relief);
+  }
+  run(0, 0, ink, alpha);
+}
+
 // Which cells get a stitch, and at what level — worked out once and shared by
 // the canvas and the SVG, so the file is what you were looking at.
 export function stitchCells(grid, o) {
@@ -525,27 +573,16 @@ export function stitchCells(grid, o) {
 }
 
 export function drawStitches(ctx, grid, o) {
-  const { ink = "#2fe36a", shape = "square" } = o;
+  const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
-  ctx.fillStyle = ink;
-  ctx.strokeStyle = ink;
   for (let l = 1; l <= levels; l++) {
-    if (!byLevel[l].length) continue;
-    ctx.globalAlpha = l / levels;
-    ctx.beginPath();
-    for (const [px, py] of byLevel[l]) {
-      if (shape === "dot") {
-        ctx.moveTo(px + size, py + size / 2);
-        ctx.arc(px + size / 2, py + size / 2, size / 2, 0, Math.PI * 2);
-      } else if (shape === "cross") {
-        const t = size * 0.34;
-        ctx.rect(px, py + (size - t) / 2, size, t);
-        ctx.rect(px + (size - t) / 2, py, t, size);
-      } else {
-        ctx.rect(px, py, size, size);
-      }
-    }
-    ctx.fill();
+    const cells = byLevel[l];
+    if (!cells.length) continue;
+    // fainter levels sit smaller, so density reads as weight and not only as tone
+    const lsize = size * (1 - swell * (1 - l / levels));
+    const off = (size - lsize) / 2;
+    paintLevel(ctx, cells.length, (i) => [cells[i][0] + off, cells[i][1] + off],
+      lsize, { ink, shape, relief }, l / levels);
   }
   ctx.globalAlpha = 1;
 }
@@ -560,6 +597,7 @@ export function drawLoose(ctx, items, o) {
     cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
     path = "line",  // "manhattan" turns a corner: across first, then down
     loosen = 0,     // over the last of the run, let them off the lattice again
+    relief = 0, swell = 0,
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -598,24 +636,13 @@ export function drawLoose(ctx, items, o) {
   }
   // Every stitch is drawn at full strength wherever it is: they are the same
   // stitches throughout, waiting to be arranged, not arriving out of nothing.
-  ctx.fillStyle = ink;
-  const r = size / 2;
   for (let l = 1; l <= levels; l++) {
     const bucket = buckets[l];
     if (!bucket.length) continue;
-    ctx.globalAlpha = l / levels;
-    ctx.beginPath();
-    for (const it of bucket) {
-      if (shape === "dot") {
-        ctx.moveTo(it.x + size, it.y + r);
-        ctx.arc(it.x + r, it.y + r, r, 0, Math.PI * 2);
-      } else if (shape === "cross") {
-        const t = size * 0.34;
-        ctx.rect(it.x, it.y + (size - t) / 2, size, t);
-        ctx.rect(it.x + (size - t) / 2, it.y, t, size);
-      } else ctx.rect(it.x, it.y, size, size);
-    }
-    ctx.fill();
+    const lsize = size * (1 - swell * (1 - l / levels));
+    const off = (size - lsize) / 2;
+    paintLevel(ctx, bucket.length, (i) => [bucket[i].x + off, bucket[i].y + off],
+      lsize, { ink, shape, relief }, l / levels);
   }
   ctx.globalAlpha = 1;
 }
