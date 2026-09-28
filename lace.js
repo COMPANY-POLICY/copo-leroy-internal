@@ -374,6 +374,81 @@ export function drawBorder(g, w, h, o) {
   g.restore();
 }
 
+// --- riso -------------------------------------------------------------------
+// A duplicator lays ink unevenly and on absorbent stock: fine grain everywhere,
+// broad patches where the drum carried more ink than elsewhere, and a scatter
+// of stray specks around every mark. Those three over a clean print are most of
+// what reads as riso.
+let grainTile = null, grainKey = "";
+function grain(seed) {
+  const key = String(seed);
+  if (grainTile && grainKey === key) return grainTile;
+  const N = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d");
+  const img = g.createImageData(N, N);
+  const r = rng32(seed >>> 0);
+  for (let i = 0; i < img.data.length; i += 4) {
+    // mid grey does nothing under overlay, so the tile is a field of
+    // departures from it — some specks lift, some sink
+    const v = r();
+    const lift = v > 0.5 ? 1 : -1;
+    const mag = Math.pow(Math.abs(v * 2 - 1), 1.7);
+    const level = 128 + lift * mag * 127;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = level;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  grainTile = c;
+  grainKey = key;
+  return c;
+}
+
+let mottleTile = null, mottleKey = "";
+function mottle(seed, w, h) {
+  const key = `${seed}|${Math.round(w)}x${Math.round(h)}`;
+  if (mottleTile && mottleKey === key) return mottleTile;
+  // drawn small and scaled up, so the interpolation does the softening
+  const cols = 24, rows = Math.max(4, Math.round((24 * h) / w));
+  const c = document.createElement("canvas");
+  c.width = cols;
+  c.height = rows;
+  const g = c.getContext("2d");
+  const img = g.createImageData(cols, rows);
+  const r = rng32((seed ^ 0x51ed) >>> 0);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const level = 128 + (r() - 0.5) * 150;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = level;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  mottleTile = c;
+  mottleKey = key;
+  return c;
+}
+
+export function applyRiso(ctx, w, h, o = {}) {
+  const { grain: gAmt = 0, mottle: mAmt = 0, seed = 1, scale = 1 } = o;
+  if (mAmt > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = "overlay";
+    ctx.globalAlpha = mAmt;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(mottle(seed, w, h), 0, 0, w, h);
+    ctx.restore();
+  }
+  if (gAmt > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = "overlay";
+    ctx.globalAlpha = gAmt;
+    ctx.scale(scale, scale);
+    ctx.fillStyle = ctx.createPattern(grain(seed), "repeat");
+    ctx.fillRect(0, 0, w / scale, h / scale);
+    ctx.restore();
+  }
+}
+
 // --- grid -------------------------------------------------------------------
 // Average coverage per cell, from a canvas rendered much larger than the grid.
 export function toGrid(src, cols, rows) {
@@ -529,7 +604,7 @@ export function stitchShape(ctx, x, y, size, shape) {
 // top. `at` hands back each position so both the still and the moving stitches
 // can use it.
 function paintLevel(ctx, count, at, size, o, alpha) {
-  const { ink, shape, relief = 0, offset = 0, offsetSeed = 0 } = o;
+  const { ink, shape, relief = 0, offset = 0, offsetSeed = 0, speckle = 0 } = o;
   const run = (dx, dy, colour, a) => {
     ctx.globalAlpha = a;
     ctx.fillStyle = colour;
@@ -547,6 +622,22 @@ function paintLevel(ctx, count, at, size, o, alpha) {
     run(d, d, mix(ink, 0, 0.5), alpha * 0.7 * relief);
   }
   run(0, 0, ink, alpha);
+
+  if (speckle > 0) {
+    // ink that did not quite make it onto the mark
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const p = at(i);
+      for (let k = 0; k < 3; k++) {
+        const n = nudge(p[0] + k * 37, p[1] - k * 53, size * 2.2 * speckle, offsetSeed + k * 911);
+        const d = size * (0.12 + 0.16 * ((k * 7 + i) % 3) / 2);
+        ctx.rect(n[0], n[1], d, d);
+      }
+    }
+    ctx.fill();
+  }
 }
 
 // Which cells get a stitch, and at what level — worked out once and shared by
@@ -589,7 +680,7 @@ export function stitchCells(grid, o) {
 
 export function drawStitches(ctx, grid, o) {
   const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
-    offset = 0, offsetSeed = 0 } = o;
+    offset = 0, offsetSeed = 0, speckle = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
   for (let l = 1; l <= levels; l++) {
     const cells = byLevel[l];
@@ -598,7 +689,7 @@ export function drawStitches(ctx, grid, o) {
     const lsize = size * (1 - swell * (1 - l / levels));
     const off = (size - lsize) / 2;
     paintLevel(ctx, cells.length, (i) => [cells[i][0] + off, cells[i][1] + off],
-      lsize, { ink, shape, relief, offset, offsetSeed }, l / levels);
+      lsize, { ink, shape, relief, offset, offsetSeed, speckle }, l / levels);
   }
   ctx.globalAlpha = 1;
 }

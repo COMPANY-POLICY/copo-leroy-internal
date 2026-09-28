@@ -199,6 +199,14 @@ woven look: the grid decides what survives, the way a weave does.
   arrives as a single object to place, recolour or cut. Tone cannot survive
   that — one path carries one fill — so the levels collapse to solid. Set
   `Levels` to 1 and the canvas shows exactly what the file will be.
+- **Riso** — a duplicator lays ink unevenly, on absorbent stock: `Grain` is the
+  fine speckle over everything, ink and ground alike, laid on as departures
+  from mid grey so some specks lift and some sink; `Mottle` is the broad
+  patchiness of a drum that carried more ink in one place than another, drawn
+  small and scaled up so the interpolation does the softening; `Speckle` is the
+  ink that did not quite make it onto the mark. With `Offset` for the
+  misregistration, those four are most of what reads as riso over a clean
+  print.
 - **Transparent ground** — drops the panel colour so the PNG exports as the
   lace alone, to lay over a photograph or a product shot. The lower tonal
   levels stay semi-transparent, which is what you want over a busy ground.
