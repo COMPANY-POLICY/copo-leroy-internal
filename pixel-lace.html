@@ -802,16 +802,24 @@ function frameFor(n) {
     case "breathe": {
       // Random stitches fading in and out, and nothing else: same cells, same
       // sizes, same places. Amount is how many of them take part — the rest
-      // hold at full. Each one that does gets its own clock, so they are never
-      // in step with each other.
+      // hold at full.
+      //
+      // One clock each is not enough on its own. Every stitch swinging the same
+      // range at much the same speed reads as a single motion wearing a lot of
+      // dots, so each also gets its own depth, its own speed over a wide range,
+      // and its own curve: a high exponent lingers dark and dips briefly, a low
+      // one sits bright and only occasionally drops.
       const share = Math.max(0.02, amt);
+      const r = (i, k) => (Math.imul(i + k, 2246822519 ^ Math.imul(k, 374761393)) >>> 0) / 4294967296;
       return {
         fade: (i) => {
-          const h = (Math.imul(i + 1, 2246822519) >>> 0) / 4294967296;
-          if (h > share) return 1; // this one sits it out
-          const ph = ((Math.imul(i + 7, 374761393) >>> 0) / 4294967296) * Math.PI * 2;
-          const rate = 0.7 + ((Math.imul(i + 13, 668265263) >>> 0) / 4294967296) * 0.9;
-          return 0.1 + 0.9 * (0.5 + 0.5 * Math.sin(t * rate + ph));
+          if (r(i, 1) > share) return 1; // this one sits it out
+          const ph = r(i, 7) * Math.PI * 2;
+          const rate = 0.25 + Math.pow(r(i, 13), 2) * 2.6;  // mostly slow, a few quick
+          const depth = 0.25 + Math.pow(r(i, 23), 1.4) * 0.72; // how far down it goes
+          const curve = 0.45 + Math.pow(r(i, 31), 1.6) * 2.8;  // and how it gets there
+          const w = Math.pow(0.5 + 0.5 * Math.sin(t * rate + ph), curve);
+          return 1 - depth * (1 - w);
         },
       };
     }

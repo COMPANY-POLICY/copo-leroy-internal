@@ -711,9 +711,11 @@ export function stitchCells(grid, o) {
   return { byLevel, size, levels };
 }
 
-// How finely a fading stitch is allowed to fade. Only the motions that fade
-// use it now — a stitch that is simply there is drawn at full strength.
-const SMOOTH_STEPS = 16;
+// How finely a fading stitch is allowed to fade. Only the motions that fade use
+// it — a stitch that is simply there is drawn at full strength. Sixteen steps
+// were coarse enough that stitches at different depths landed on the same one,
+// which flattened the variation between them.
+const SMOOTH_STEPS = 32;
 
 export function drawStitches(ctx, grid, o) {
   const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
