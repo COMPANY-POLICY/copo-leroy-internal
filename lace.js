@@ -5,7 +5,7 @@
 // the block beneath it. Quantising that average is what gives the woven look —
 // the grid does the drawing's work of deciding what survives.
 
-import { rng32 } from "./leroy-cursor.js";
+import { rng32, valueNoise } from "./leroy-cursor.js";
 
 // --- motif ------------------------------------------------------------------
 function bez(g, p, steps = 40) {
@@ -372,6 +372,120 @@ export function drawBorder(g, w, h, o) {
     corners: o.corners,
   });
   g.restore();
+}
+
+// When each cell is reached if growth spreads through the ink from its densest
+// point at an uneven rate — first-passage percolation. A plain breadth-first
+// walk gives every cell its distance and the front comes out as a clean ring;
+// charging a cost for each step instead lets some paths race ahead and others
+// lag, so the front ends up ragged and lobed, which is what a colony spreading
+// on a plate looks like. Growth still only reaches a cell through its
+// neighbours, so nothing can appear before what it grew out of.
+//
+// The cost has to come in patches, not per step. Independent noise on each step
+// washes straight out — a shortest path simply routes around any one slow cell,
+// and the front comes back almost as smooth as it started. Ground that is slow
+// or quick in patches the size of several cells cannot be routed around, and
+// that is what makes fingers.
+export function growthField(grid, o = {}) {
+  const { cols, rows, cells } = grid;
+  const ink = o.ink ?? 0.12;
+  const rough = o.roughness ?? 1;
+  const seed = (o.seed ?? 1) >>> 0;
+  const scale = o.scale ?? 0.14;
+  const jitter = (seed % 997) * 3.7;
+  const costAt = (x, y) => {
+    const a = valueNoise(x * scale + jitter, y * scale + jitter);
+    const b = valueNoise(x * scale * 2.9 + 31, y * scale * 2.9 + 17);
+    const nz = a * 0.72 + b * 0.28;
+    // squared, so the slow ground is properly slow and growth has to go round
+    return 0.2 + rough * 7 * nz * nz;
+  };
+  const n = cols * rows;
+  const dist = new Float32Array(n).fill(Infinity);
+  const rnd = rng32(seed);
+
+  let sx = 0, sy = 0, count = 0;
+  for (let i = 0; i < n; i++) {
+    if (cells[i] < ink) continue;
+    sx += i % cols; sy += (i / cols) | 0; count++;
+  }
+  if (!count) return { field: new Float32Array(n), max: 1 };
+  const cx = sx / count, cy = sy / count;
+  let seedCell = -1, best = Infinity;
+  for (let i = 0; i < n; i++) {
+    if (cells[i] < ink) continue;
+    const dx = (i % cols) - cx, dy = ((i / cols) | 0) - cy, d = dx * dx + dy * dy;
+    if (d < best) { best = d; seedCell = i; }
+  }
+
+  // a binary heap, since the step costs differ and a queue would no longer
+  // come out in order
+  const hv = new Float64Array(n + 1), hi = new Int32Array(n + 1);
+  let size = 0;
+  const push = (v, idx) => {
+    let k = ++size; hv[k] = v; hi[k] = idx;
+    while (k > 1 && hv[k >> 1] > hv[k]) {
+      [hv[k], hv[k >> 1]] = [hv[k >> 1], hv[k]];
+      [hi[k], hi[k >> 1]] = [hi[k >> 1], hi[k]];
+      k >>= 1;
+    }
+  };
+  const pop = () => {
+    const top = hi[1];
+    hv[1] = hv[size]; hi[1] = hi[size--];
+    let k = 1;
+    for (;;) {
+      const l = k << 1, r = l + 1;
+      let m = k;
+      if (l <= size && hv[l] < hv[m]) m = l;
+      if (r <= size && hv[r] < hv[m]) m = r;
+      if (m === k) break;
+      [hv[k], hv[m]] = [hv[m], hv[k]];
+      [hi[k], hi[m]] = [hi[m], hi[k]];
+      k = m;
+    }
+    return top;
+  };
+
+  dist[seedCell] = 0;
+  push(0, seedCell);
+  const walk = (through) => {
+    while (size > 0) {
+      const i = pop();
+      const x = i % cols, y = (i / cols) | 0, base = dist[i];
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (!ox && !oy) continue;
+          const nx = x + ox, ny = y + oy;
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          const j = ny * cols + nx;
+          if (through !== (cells[j] >= ink)) continue;
+          const step = (ox && oy ? 1.414 : 1) * costAt(nx, ny) * (0.85 + rnd() * 0.3);
+          const d = base + step;
+          if (d < dist[j]) { dist[j] = d; push(d, j); }
+        }
+      }
+    }
+  };
+  walk(true);
+
+  // islands the growth cannot reach — the frame is one — start from where they
+  // sit, so they come in around the same time as the ink nearest them
+  for (let i = 0; i < n; i++) {
+    if (cells[i] < ink || dist[i] !== Infinity) continue;
+    const dx = (i % cols) - cx, dy = ((i / cols) | 0) - cy;
+    dist[i] = Math.hypot(dx, dy) * (1 + rough);
+    push(dist[i], i);
+    walk(true);
+  }
+
+  let max = 0;
+  for (let i = 0; i < n; i++) if (dist[i] !== Infinity && dist[i] > max) max = dist[i];
+  max = max || 1;
+  const field = new Float32Array(n);
+  for (let i = 0; i < n; i++) field[i] = dist[i] === Infinity ? 1 : dist[i] / max;
+  return { field, max };
 }
 
 // --- riso -------------------------------------------------------------------

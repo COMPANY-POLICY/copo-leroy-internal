@@ -238,7 +238,7 @@
 // and run it against a freshly loaded page, which presents as a change that
 // silently did nothing — and costs an afternoon before anyone suspects it.
 const { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches,
-  drawLoose, stitchCells, toSVG, shapeField, applyRiso } =
+  drawLoose, stitchCells, toSVG, shapeField, growthField, applyRiso } =
   await import(`./lace.js?t=${Date.now()}`);
 
 const $ = (id) => document.getElementById(id);
@@ -602,7 +602,10 @@ function branchStitches() {
     S.w, S.h].join("|");
   if (branched && branched.key === key) return branched;
   const { byLevel, size, levels } = stitchCells(grid, drawOpts());
-  const fld = shapeField(grid, { ink: Math.max(0.06, S.threshold * 0.6) }).field;
+  // when growth reaches each cell, spreading through the ink at an uneven rate
+  const fld = growthField(grid, {
+    ink: Math.max(0.06, S.threshold * 0.6), seed: S.seed, roughness: 1,
+  }).field;
   const { cols, rows } = grid;
   const cw = S.w / cols, ch = S.h / rows;
   const items = [];
@@ -828,16 +831,14 @@ function frameFor(n) {
       // lies through the shape from the heart, and comes out of whichever
       // neighbouring cell lies closer in — so a branch extends along itself
       // instead of every stitch sliding in from one direction.
+      // Grows and then stays: what has grown is not taken back, so the symbol
+      // is there to look at rather than passing through. Amount is how long it
+      // holds before starting over.
       const steps = Math.max(2, Math.round(S.steps));
-      const hold = Math.max(1, Math.round((0.4 + amt * 3) * S.fps));
-      const cycle = steps * 2 + hold * 2;
-      const k = ((n % cycle) + cycle) % cycle;
-      let step;
-      if (k < steps) step = k;                                   // growing out
-      else if (k < steps + hold) step = steps;                   // grown
-      else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // drawing back
-      else step = 0;                                             // nothing there
-      return { loose: branchStitches(), phase: step / steps, emerge: true, stagger: 0.8 };
+      const hold = Math.max(1, Math.round((0.5 + amt * 6) * S.fps));
+      const cycle = steps + hold;
+      const step = Math.min(steps, ((n % cycle) + cycle) % cycle);
+      return { loose: branchStitches(), phase: step / steps, emerge: true, stagger: 0.85 };
     }
     case "gather": {
       // Counted in frames rather than seconds: one step per frame, so Steps is
