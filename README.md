@@ -111,6 +111,12 @@ woven look: the grid decides what survives, the way a weave does.
   cross), how many tonal levels, and dither, which breaks flat areas into
   stitches instead of slabs.
 - **Ink** — threshold and contrast decide how much of the motif makes the cut.
+  `Scatter` moves each stitch off its cell for good and `Vary` gives each one
+  its own size, both keyed to the print rather than the frame, so a field of
+  them stops reading as a grid: at 0.7 of a cell the positions spread evenly
+  right across the cell instead of sitting at one point in it, and at 0.5 the
+  sizes run from half to one and a half. That is the difference between stitched
+  and stippled.
   `Offset` nudges each stitch off its cell by an amount fixed for that cell and
   that frame, so it re-rolls as it plays — printing that misses its register by
   a hair is alive in a way a perfect grid is not, and it gives the stitches

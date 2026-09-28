@@ -96,6 +96,10 @@
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
     <label><span>Levels <b id="v-levels"></b></span>
       <input id="levels" type="range" min="1" max="5" step="1" value="3" /></label>
+    <label><span>Scatter <b id="v-scatter"></b></span>
+      <input id="scatter" type="range" min="0" max="1.5" step="0.05" value="0" /></label>
+    <label><span>Vary <b id="v-vary"></b></span>
+      <input id="vary" type="range" min="0" max="0.9" step="0.05" value="0" /></label>
     <label><span>Offset <b id="v-offset"></b></span>
       <input id="offset" type="range" min="0" max="1" step="0.05" value="0" /></label>
     <label><span>Relief <b id="v-relief"></b></span>
@@ -250,7 +254,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, offset: 0,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, offset: 0, scatter: 0, vary: 0,
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
@@ -463,6 +467,7 @@ function draw(frame = null) {
       loosen: 0.3, relief: S.relief, swell: S.swell,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.speckle, speckleSeed: S.seed,
+      scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
     });
   } else {
     drawStitches(g, frame?.grid || grid, {
@@ -472,6 +477,7 @@ function draw(frame = null) {
       seed: frame?.seed ?? S.seed, relief: S.relief, swell: S.swell,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.speckle, speckleSeed: S.seed,
+      scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
     });
   }
   compositeStitches(g);
@@ -824,7 +830,8 @@ const SLIDERS = [
   ["steps", "steps", true],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
   ["soft", "soft", true, f2], ["relief", "relief", true, f2], ["swell", "swell", true, f2],
-  ["offset", "offset", true, f2],
+  ["offset", "offset", true, f2], ["scatter", "scatter", true, f2],
+  ["vary", "vary", true, f2],
   ["grain", "grain", true, f2], ["mottle", "mottle", true, f2],
   ["speckle", "speckle", true, f2],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
@@ -875,7 +882,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "offset", "grain", "mottle", "speckle"];
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
