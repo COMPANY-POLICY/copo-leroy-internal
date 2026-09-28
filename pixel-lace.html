@@ -102,6 +102,8 @@
       <input id="vary" type="range" min="0" max="0.9" step="0.05" value="0" /></label>
     <label><span>Offset <b id="v-offset"></b></span>
       <input id="offset" type="range" min="0" max="1" step="0.05" value="0" /></label>
+    <label><span>Shadow <b id="v-shadow"></b></span>
+      <input id="shadow" type="range" min="0" max="1" step="0.05" value="0" /></label>
     <label><span>Relief <b id="v-relief"></b></span>
       <input id="relief" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
     <label><span>Swell <b id="v-swell"></b></span>
@@ -254,7 +256,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, offset: 0, scatter: 0, vary: 0,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
@@ -426,7 +428,7 @@ function drawOpts() {
 // stays crisp.
 let softLayer = null;
 function stitchTarget() {
-  if (!(S.soft > 0)) return ctx;
+  if (!(S.soft > 0) && !(S.shadow > 0)) return ctx;
   if (!softLayer) softLayer = document.createElement("canvas");
   if (softLayer.width !== stage.width || softLayer.height !== stage.height) {
     softLayer.width = stage.width;
@@ -438,10 +440,31 @@ function stitchTarget() {
   g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
   return g;
 }
+// what the shadow is, in panel units — shared with the SVG so the two agree
+function shadowSpec() {
+  const cell = S.w / (grid ? grid.cols : 120);
+  return {
+    dx: cell * 0.4 * S.shadow,
+    dy: cell * 0.4 * S.shadow,
+    blur: cell * 0.3 * S.shadow,
+    alpha: 0.5 * S.shadow,
+  };
+}
+
 function compositeStitches(g) {
   if (g === ctx) return;
   ctx.save();
   ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  if (S.shadow > 0) {
+    // the same layer again, cast dark and offset: brightness(0) makes it a
+    // silhouette of whatever shape the stitches happen to be
+    const sh = shadowSpec();
+    ctx.save();
+    ctx.filter = `blur(${S.soft + sh.blur}px) brightness(0)`;
+    ctx.globalAlpha = sh.alpha;
+    ctx.drawImage(softLayer, sh.dx, sh.dy, S.w, S.h);
+    ctx.restore();
+  }
   ctx.filter = `blur(${S.soft}px)`;
   ctx.drawImage(softLayer, 0, 0, S.w, S.h);
   ctx.restore();
@@ -830,6 +853,7 @@ const SLIDERS = [
   ["steps", "steps", true],
   ["cols", "cols", false], ["gap", "gap", true, f2], ["levels", "levels", true],
   ["soft", "soft", true, f2], ["relief", "relief", true, f2], ["swell", "swell", true, f2],
+  ["shadow", "shadow", true, f2],
   ["offset", "offset", true, f2], ["scatter", "scatter", true, f2],
   ["vary", "vary", true, f2],
   ["grain", "grain", true, f2], ["mottle", "mottle", true, f2],
@@ -882,7 +906,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
   "medallion", "petals", "cols", "gap", "levels", "dither", "shape", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
+  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -1180,6 +1204,7 @@ $("saveSvg").addEventListener("click", () => {
     // match what is on screen: the ground unless it is transparent, the
     // relief, and the softness as a blur of the same radius
     bg: S.alpha ? null : S.bg, relief: S.relief, soft: S.soft,
+    shadow: S.shadow > 0 ? shadowSpec() : null,
   });
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   download(url, `pixel-lace-${S.w}x${S.h}.svg`);

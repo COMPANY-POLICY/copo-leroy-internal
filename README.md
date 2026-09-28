@@ -121,7 +121,10 @@ woven look: the grid decides what survives, the way a weave does.
   that frame, so it re-rolls as it plays — printing that misses its register by
   a hair is alive in a way a perfect grid is not, and it gives the stitches
   something to do while the pattern itself holds still.
-  `Relief` puts a lit copy behind each stitch and a shaded one under it, and
+  `Shadow` casts the whole stitch layer again, dark, offset and spread — one
+  filtered draw for the lot, where shadowing each stitch separately would be
+  thousands. It is what lifts them off the ground; `Relief` only bevels them
+  where they sit. `Relief` puts a lit copy behind each stitch and a shaded one under it, and
   `Swell` scales a stitch with how solid that part of the pattern is, so
   density reads as weight rather than only as tone — one flat colour at one
   size is what makes a panel read as a swatch. `Softness` feathers the stitches: they are drawn to their own layer and
@@ -202,7 +205,8 @@ woven look: the grid decides what survives, the way a weave does.
   it, webm otherwise.
 - **Save PNG / Save SVG** — the SVG mirrors what the canvas paints rather than
   flattening it, and works the geometry out again rather than tracing it: the
-  ground, the tonal levels as an opacity each, relief as its own colours, swell,
+  ground, the tonal levels as an opacity each, relief as its own colours, the shadow as a drop
+  shadow of the same offset and spread, swell,
   scatter, vary, the offset, the speckle, and softness as a blur of the same
   radius. Rendered back and compared with the canvas over the same ground it
   differs by 0% of pixels with a transparent ground and 2.6% with an opaque one,
