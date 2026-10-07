@@ -40,11 +40,12 @@
     .topnav { flex: none; display: flex; align-items: center; gap: 14px;
       padding: 14px 32px; border-bottom: 1px solid var(--border);
       background: var(--bg-elevated); }
-    .topnav .wordmark { display: block; height: 30px; width: auto; }
-    .topnav__switches { margin-left: auto; display: flex; align-items: center; gap: 18px; }
-
-    /* What a thing is set to, rather than a button you press: the three that
-       turn a whole part of the panel on or off live up here. */
+    .topnav .wordmark { display: block; height: 40px; width: auto; }
+    /* What a thing is set to, rather than a button you press: a switch that
+       turns a whole section on or off sits on that section's own header. */
+    h2 .switch { margin: 0 0 0 auto; }
+    .switch > span { margin-bottom: 0; }
+    h2:has(.switch) { display: flex; align-items: center; gap: 8px; }
     .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
       font-size: 0.75rem; color: var(--ink-muted); user-select: none; }
     .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -70,10 +71,10 @@
 
     #stage { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%;
       box-shadow: var(--shadow); }
-    #stage.alpha {
+    #stage.alpha, #lg-c.alpha, .swatches button.clear {
       background-image:
-        linear-gradient(45deg, #efe7cd 25%, transparent 25%, transparent 75%, #efe7cd 75%),
-        linear-gradient(45deg, #efe7cd 25%, transparent 25%, transparent 75%, #efe7cd 75%);
+        linear-gradient(45deg, #d9d9d9 25%, transparent 25%, transparent 75%, #d9d9d9 75%),
+        linear-gradient(45deg, #d9d9d9 25%, transparent 25%, transparent 75%, #d9d9d9 75%);
       background-size: 24px 24px;
       background-position: 0 0, 12px 12px;
       background-color: var(--c-white);
@@ -99,6 +100,19 @@
     .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--c-olive); }
     .tabpanel[hidden], aside [hidden] { display: none; }
 
+    /* the Logo tab's own stage: the particulate canvas, scrolled when it is
+       shown larger than there is room for */
+    #logoStage { position: absolute; inset: 0; overflow: auto; display: grid; place-items: center;
+      padding: 24px; }
+    #logoStage[hidden] { display: none; }
+    #lg-c { display: block; box-shadow: var(--shadow); }
+    input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+      border-radius: 6px; background: var(--bg-elevated); color: var(--ink); font: inherit; }
+    #lg-stat { margin-top: 8px; color: var(--ink-muted); }
+    @font-face { font-family: 'Garara Italic'; src: url('fonts/Garara-Italic.woff2') format('woff2'); }
+    @font-face { font-family: 'Neue Haas Grotesk Roman'; src: url('fonts/NeueHaasGroteskDisplay-55Roman.otf'); }
+    @font-face { font-family: 'Neue Haas Grotesk Bold'; src: url('fonts/NeueHaasGroteskDisplay-75Bold.otf'); }
+
     label { display: block; margin-bottom: 10px; }
     label > span { display: flex; justify-content: space-between; align-items: baseline;
       gap: 8px; color: var(--ink-muted); margin-bottom: 4px; }
@@ -121,7 +135,8 @@
     select:focus-visible, input[type=number]:focus-visible { outline: 2px solid var(--accent-soft);
       border-color: var(--accent); }
 
-    .swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+    .swatches button.clear { background-size: 8px 8px; background-position: 0 0, 4px 4px; }
     .swatches button { padding: 0; height: 20px; border-radius: 4px; border: 1px solid var(--border);
       cursor: pointer; }
     .swatches button:hover { border-color: rgba(0,0,0,.35); }
@@ -162,14 +177,6 @@
 <body>
 <header class="topnav">
   <img class="wordmark" src="logo.png" alt="Archuedy" />
-  <div class="topnav__switches">
-    <label class="switch"><span>Transparent</span>
-      <input type="checkbox" id="alphaSw" /><span class="track"></span></label>
-    <label class="switch"><span>Border</span>
-      <input type="checkbox" id="borderSw" checked /><span class="track"></span></label>
-    <label class="switch"><span>Riso</span>
-      <input type="checkbox" id="risoSw" checked /><span class="track"></span></label>
-  </div>
 </header>
 
 <div id="wrap">
@@ -177,6 +184,7 @@
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="design" aria-selected="true">Design</button>
       <button role="tab" data-tab="motion" aria-selected="false">Motion</button>
+      <button role="tab" data-tab="logo" aria-selected="false">Logo</button>
     </nav>
     <div class="tabpanel" id="tab-design" role="tabpanel">
     <h2>Panel</h2>
@@ -228,9 +236,9 @@
         <button id="seedDown" style="flex:0 0 32px">◀</button>
         <input type="number" id="seed" value="20260917" style="flex:1; text-align:center" />
         <button id="seedUp" style="flex:0 0 32px">▶</button>
+        <button id="shuffle" style="flex:0 0 auto">Shuffle</button>
       </div>
     </label>
-    <div class="row"><button id="shuffle">Shuffle</button><button id="copyLink">Copy link</button></div>
     <label id="symmetryRow" style="margin-top:8px"><span>Symmetry</span><select id="symmetry">
       <option value="mirror4">mirrored — both axes</option>
       <option value="none">none — a single spray</option>
@@ -274,12 +282,14 @@
       <input id="petals" type="range" min="3" max="16" step="1" value="8" /></label>
     </div>
 
-    <h2>Border</h2>
+    <h2>Border
+      <label class="switch"><input type="checkbox" id="borderSw" aria-label="Border" checked /><span class="track"></span></label></h2>
     <div class="row">
       <button id="cornersBtn" data-on="true">Corners</button>
     </div>
 
-    <h2>Riso</h2>
+    <h2>Riso
+      <label class="switch"><input type="checkbox" id="risoSw" aria-label="Riso" checked /><span class="track"></span></label></h2>
     <label><span>Grain <b id="v-grain"></b></span>
       <input id="grain" type="range" min="0" max="1" step="0.05" value="0.2" /></label>
     <label><span>Mottle <b id="v-mottle"></b></span>
@@ -332,11 +342,132 @@
 
     </div>
 
+
+    <div class="tabpanel" id="tab-logo" role="tabpanel" hidden>
+    <h2>Look</h2>
+    <input type="checkbox" id="lg-alpha" hidden />
+    <label><select id="lg-preset">
+      <option value="contour">contour cloud — dots trace the edges</option>
+      <option value="wordmark">wordmark — solid letters and spray</option>
+      <option value="custom">custom</option>
+    </select></label>
+    <label><span>Background <b id="lg-vBgC"></b></span><div class="swatches" id="lg-bgSw"></div></label>
+    <label><span>Particles <b id="lg-vInkC"></b></span><div class="swatches" id="lg-inkSw"></div></label>
+    <input type="hidden" id="lg-bgc" value="#403b12" />
+    <input type="hidden" id="lg-inkc" value="#fff278" />
+
+    <h2>Source</h2>
+    <label><select id="lg-src">
+      <option value="text">typed word</option>
+      <option value="image">image file</option>
+    </select></label>
+    <input type="file" id="lg-imgFile" accept="image/*" hidden />
+    <div data-for="image">
+    <button id="lg-upload" style="width:100%; margin-bottom:10px">Upload image…</button>
+    <label><span>Threshold <b id="lg-vThr"></b></span>
+      <input type="range" id="lg-thr" min="1" max="254" value="128" /></label>
+    <label><span>Padding <b id="lg-vPad"></b></span>
+      <input type="range" id="lg-pad" min="0" max="60" value="18" /></label>
+    <label><span>Ink is</span><select id="lg-imgink">
+      <option value="dark">dark pixels</option>
+      <option value="light">light pixels</option>
+      <option value="opaque">opaque areas</option>
+      <option value="hole">transparent areas — knockout art</option>
+    </select></label>
+    </div>
+
+    <div data-for="text">
+    <h2>Type</h2>
+    <label><span>Word</span><input type="text" id="lg-word" value="Archadia" /></label>
+    <label><span>Typeface</span><select id="lg-face">
+      <option value="Garara Italic">Garara Italic</option>
+      <option value="Neue Haas Grotesk Roman">Neue Haas Grotesk 55 Roman</option>
+      <option value="Neue Haas Grotesk Bold">Neue Haas Grotesk 75 Bold</option>
+    </select></label>
+    <div>
+    <label><span>Letter width <b id="lg-vWide"></b></span>
+      <input type="range" id="lg-wide" min="40" max="260" value="60" /></label>
+    <label><span>Letter size <b id="lg-vSize"></b></span>
+      <input type="range" id="lg-size" min="40" max="150" value="96" /></label>
+    <label><span>Tracking <b id="lg-vTrack"></b></span>
+      <input type="range" id="lg-track" min="-120" max="300" value="0" /></label>
+    </div>
+    <label><span>Layout</span><select id="lg-layout">
+      <option value="row">horizontal banner</option>
+      <option value="stack">vertical stack — poster</option>
+    </select></label>
+    <label id="lg-alignRow"><span>Align</span>
+      <div class="row" id="lg-alignBtns">
+        <button data-align="left" data-on="false">Left</button>
+        <button data-align="center" data-on="true">Centre</button>
+        <button data-align="right" data-on="false">Right</button>
+      </div>
+      <input type="hidden" id="lg-align" value="center" /></label>
+    </div>
+
+    <h2>Particles</h2>
+    <label><span>Seed</span>
+      <div class="row">
+        <button id="lg-seedDown" style="flex:0 0 32px">◀</button>
+        <input type="number" id="lg-seed" min="0" value="410" style="flex:1; text-align:center" />
+        <button id="lg-seedUp" style="flex:0 0 32px">▶</button>
+        <button id="lg-rand" style="flex:0 0 auto">Shuffle</button>
+      </div>
+    </label>
+    <label><select id="lg-mode">
+      <option value="all">letters and escaping spray — full field</option>
+      <option value="in">inside only — the letters are the particles</option>
+      <option value="out">outside only — shape knocked out</option>
+      <option value="both">solid shape and spray</option>
+    </select></label>
+    <label><span>Particles (k) <b id="lg-vN"></b></span>
+      <input type="range" id="lg-n" min="20" max="900" value="900" /></label>
+    <label><span>Spray distance <b id="lg-vSpray"></b></span>
+      <input type="range" id="lg-spray" min="0" max="700" value="127" /></label>
+    <label><span>Swirl <b id="lg-vSwirl"></b></span>
+      <input type="range" id="lg-swirl" min="0" max="160" value="160" /></label>
+    <label><span>Flow scale <b id="lg-vScale"></b></span>
+      <input type="range" id="lg-scale" min="5" max="120" value="59" /></label>
+    <label><span>Drift X <b id="lg-vDx"></b></span>
+      <input type="range" id="lg-dx" min="-150" max="150" value="7" /></label>
+    <label><span>Drift Y <b id="lg-vDy"></b></span>
+      <input type="range" id="lg-dy" min="-100" max="100" value="32" /></label>
+    <label><span>Edge bias <b id="lg-vEdge"></b></span>
+      <input type="range" id="lg-edge" min="0" max="100" value="12" /></label>
+    <label><span>Core <b id="lg-vCore"></b></span>
+      <input type="range" id="lg-core" min="0" max="100" value="0" /></label>
+
+    <h2>Ink</h2>
+    <label><span>Ink density <b id="lg-vInk"></b></span>
+      <input type="range" id="lg-ink" min="5" max="300" value="163" /></label>
+    <label><span>Grain <b id="lg-vGrain"></b></span>
+      <input type="range" id="lg-grain" min="0" max="100" value="41" /></label>
+    <label><span>Particle size (px) <b id="lg-vDotpx"></b></span>
+      <input type="range" id="lg-dotpx" min="1" max="12" value="2" /></label>
+    <label><span>Outside strength <b id="lg-vOut"></b></span>
+      <input type="range" id="lg-outw" min="0" max="200" value="60" /></label>
+    <label><span>Letter solidity <b id="lg-vSolid"></b></span>
+      <input type="range" id="lg-solid" min="0" max="100" value="45" /></label>
+    <label><span>Distress gradient <b id="lg-vGrad"></b></span>
+      <input type="range" id="lg-grad" min="0" max="100" value="65" /></label>
+    <label><span>Gradient direction</span><select id="lg-graddir">
+      <option value="lr">clean left → distressed right</option>
+      <option value="rl">clean right → distressed left</option>
+      <option value="tb">clean top → distressed bottom</option>
+      <option value="bt">clean bottom → distressed top</option>
+    </select></label>
+
+    <h2>Output</h2>
+    <div class="row"><button id="lg-dlPng">Save PNG</button><button id="lg-dlSvg">Save SVG</button></div>
+    <div id="lg-stat"></div>
+    </div>
+
     <div style="color:var(--dim); margin-top:8px" id="info">—</div>
   </aside>
   <div id="stageWrap">
     <canvas id="stage"></canvas>
     <div id="drop">drop an image — it comes back as lace</div>
+    <div id="logoStage" hidden><canvas id="lg-c"></canvas></div>
   </div>
 
 </div>
@@ -351,12 +482,24 @@ const { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches,
 
 const $ = (id) => document.getElementById(id);
 
+let logoLoaded = null;
 for (const tab of document.querySelectorAll(".tabs [role=tab]")) {
   tab.addEventListener("click", () => {
     for (const t of document.querySelectorAll(".tabs [role=tab]")) {
       const on = t === tab;
       t.setAttribute("aria-selected", on);
       $(`tab-${t.dataset.tab}`).hidden = !on;
+    }
+    // The logo is a separate piece of work with its own canvas, so its tab
+    // swaps the stage too, and puts away what only applies to the lace.
+    document.querySelector("aside").scrollTop = 0;
+    const logo = tab.dataset.tab === "logo";
+    $("logoStage").hidden = !logo;
+    stage.hidden = logo;
+    $("info").hidden = logo;
+    if (logo) {
+      stopMotion();
+      logoLoaded ??= import(`./logo.js?t=${Date.now()}`); // built the first time it is asked for
     }
   });
 }
@@ -1137,7 +1280,6 @@ function syncControls() {
   motionRows();
   for (const [id, key] of [["cornersBtn", "corners"], ["invert", "invert"]])
     $(id).dataset.on = String(S[key]);
-  $("alphaSw").checked = !!S.alpha;
   $("borderSw").checked = !!S.border;
   $("risoSw").checked = !!S.riso;
   stage.classList.toggle("alpha", S.alpha);
@@ -1366,15 +1508,16 @@ const setSeed = (v) => { S.seed = v >>> 0; $("seed").value = S.seed; build(); wr
 $("seed").addEventListener("input", (e) => { S.seed = (+e.target.value || 0) >>> 0; build(); writeHash(); });
 $("seedDown").addEventListener("click", () => setSeed(S.seed - 1));
 $("seedUp").addEventListener("click", () => setSeed(S.seed + 1));
-$("copyLink").addEventListener("click", async (e) => {
-  writeHash();
-  try {
-    await navigator.clipboard.writeText(location.href);
-    const b = e.currentTarget, t = b.textContent;
-    b.textContent = "Copied";
-    setTimeout(() => (b.textContent = t), 1200);
-  } catch { /* clipboard blocked — the URL bar has it either way */ }
-});
+// Transparent is a ground like any other, so it is chosen like one: a checked
+// swatch at the end of the background row, rather than a separate switch.
+function clearSwatch(onPick) {
+  const b = document.createElement("button");
+  b.className = "clear";
+  b.title = "Transparent";
+  b.setAttribute("aria-label", "Transparent");
+  b.addEventListener("click", onPick);
+  return b;
+}
 function buildSwatches(hostId, key) {
   const host = $(hostId);
   host.innerHTML = "";
@@ -1385,19 +1528,29 @@ function buildSwatches(hostId, key) {
     b.dataset.hex = hex;
     b.addEventListener("click", () => {
       S[key] = hex;
+      if (key === "bg") { S.alpha = false; stage.classList.remove("alpha"); }
       markSwatches();
       draw();
       writeHash();
     });
     host.appendChild(b);
   }
+  if (key === "bg") host.appendChild(clearSwatch(() => {
+    S.alpha = true;
+    stage.classList.add("alpha");
+    markSwatches();
+    draw();
+    writeHash();
+  }));
 }
 function markSwatches() {
   for (const [hostId, key] of [["bgSw", "bg"], ["inkSw", "ink"]]) {
+    const clear = key === "bg" && S.alpha;
     const cur = String(S[key]).toLowerCase();
-    for (const b of $(hostId).children) b.dataset.on = String(b.dataset.hex === cur);
+    for (const b of $(hostId).children)
+      b.dataset.on = String(b.classList.contains("clear") ? clear : !clear && b.dataset.hex === cur);
     const out = $("v-" + key);
-    if (out) out.textContent = cur.toUpperCase();
+    if (out) out.textContent = clear ? "Transparent" : cur.toUpperCase();
   }
 }
 buildSwatches("bgSw", "bg");
@@ -1427,12 +1580,6 @@ $("preset").addEventListener("change", (e) => {
 for (const id of ["pw", "ph"])
   $(id).addEventListener("change", () => setSize(+$("pw").value, +$("ph").value));
 $("shuffle").addEventListener("click", () => setSeed((Math.random() * 1e9) | 0));
-$("alphaSw").addEventListener("change", (e) => {
-  S.alpha = e.target.checked;
-  stage.classList.toggle("alpha", S.alpha);
-  draw();
-  writeHash();
-});
 $("borderSw").addEventListener("change", (e) => {
   S.border = e.target.checked;
   build(); // the frame is part of the motif, so the grid is remade
@@ -1492,7 +1639,14 @@ addEventListener("drop", (e) => {
   e.preventDefault();
   dropEl.classList.remove("on");
   const f = e.dataTransfer.files[0];
-  if (f && f.type.startsWith("image/")) loadImage(f);
+  if (!f || !f.type.startsWith("image/")) return;
+  if ($("tab-logo").hidden) loadImage(f);
+  else { // on the Logo tab, it is artwork for the particles
+    const input = $("lg-imgFile"), dt = new DataTransfer();
+    dt.items.add(f);
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+  }
 });
 
 hashLock = true;
