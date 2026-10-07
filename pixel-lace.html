@@ -245,8 +245,6 @@
       <input id="spread" type="range" min="0" max="1" step="0.02" value="0.38" /></label>
     <label><span>Leafiness <b id="v-leafiness"></b></span>
       <input id="leafiness" type="range" min="0" max="2" step="0.05" value="0.9" /></label>
-    <label><span>Weight <b id="v-weight"></b></span>
-      <input id="weight" type="range" min="0.2" max="3" step="0.1" value="0.6" /></label>
     <label><span>Medallion <b id="v-medallion"></b></span>
       <input id="medallion" type="range" min="0" max="0.7" step="0.02" value="0.26" /></label>
     <label><span>Petals <b id="v-petals"></b></span>
@@ -365,7 +363,8 @@ const S = {
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
-  stems: 5, spread: 0.38, leafiness: 0.9, weight: 0.6, medallion: 0.26, petals: 8,
+  stems: 5, spread: 0.38, leafiness: 0.9, medallion: 0.26, petals: 8,
+  weight: 0.5, // the motif's stroke, fixed — no longer a control
   border: true, corners: true, inset: 0.05, bands: 2,
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
   motion: "none", fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
@@ -1082,7 +1081,7 @@ const SLIDERS = [
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
   ["contrast", "contrast", true, (v) => v.toFixed(1)],
   ["stems", "stems", false], ["spread", "spread", false, f2],
-  ["leafiness", "leafiness", false, f2], ["weight", "weight", false, (v) => v.toFixed(1)],
+  ["leafiness", "leafiness", false, f2],
   ["medallion", "medallion", false, f2], ["petals", "petals", false],
   ["inset", "inset", false, (v) => v.toFixed(3)], ["bands", "bands", false],
   ["repeat", "repeat", false], ["zoom", "zoom", false, (v) => v.toFixed(2) + "×"],
@@ -1124,7 +1123,7 @@ function syncControls() {
 }
 
 // a seed is only worth having if you can get back to it
-const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
+const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness",
   "medallion", "petals", "cols", "gap", "dither", "threshold",
   "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
