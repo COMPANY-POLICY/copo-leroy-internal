@@ -255,12 +255,6 @@
       <button id="borderBtn" data-on="true">Border</button>
       <button id="cornersBtn" data-on="true">Corners</button>
     </div>
-    <div class="mini" style="margin-top:8px">
-      <label><span>Inset <b id="v-inset"></b></span>
-        <input id="inset" type="range" min="0.01" max="0.16" step="0.005" value="0.05" /></label>
-      <label><span>Bands <b id="v-bands"></b></span>
-        <input id="bands" type="range" min="1" max="4" step="1" value="2" /></label>
-    </div>
 
     <h2>Riso</h2>
     <label><span>Grain <b id="v-grain"></b></span>
@@ -365,7 +359,8 @@ const S = {
   seed: 20260917, symmetry: "mirror4", repeat: 4,
   stems: 5, spread: 0.38, leafiness: 0.9, medallion: 0.26, petals: 8,
   weight: 0.5, // the motif's stroke, fixed — no longer a control
-  border: true, corners: true, inset: 0.05, bands: 2,
+  border: true, corners: true,
+  inset: 0.02, bands: 2, // the frame's own proportions, fixed
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
   motion: "none", fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
 };
@@ -1083,7 +1078,7 @@ const SLIDERS = [
   ["stems", "stems", false], ["spread", "spread", false, f2],
   ["leafiness", "leafiness", false, f2],
   ["medallion", "medallion", false, f2], ["petals", "petals", false],
-  ["inset", "inset", false, (v) => v.toFixed(3)], ["bands", "bands", false],
+
   ["repeat", "repeat", false], ["zoom", "zoom", false, (v) => v.toFixed(2) + "×"],
 ];
 const bind = ([id, key, redrawOnly = false, fmt = (v) => v]) => {
@@ -1125,7 +1120,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness",
   "medallion", "petals", "cols", "gap", "dither", "threshold",
-  "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
+  "contrast", "border", "corners", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
