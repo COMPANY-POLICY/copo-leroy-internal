@@ -67,8 +67,8 @@
 
     /* a hairline between sections, the way the rail groups read there */
     h2 { margin: 16px 0 10px; padding-top: 14px; border-top: 1px solid var(--border);
-      font-size: 1.1rem; font-weight: 400; letter-spacing: .01em; color: var(--ink-muted); }
-    h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+      font-size: 1.1rem; font-weight: 400; letter-spacing: .01em; color: var(--ink); }
+    .tabpanel > h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 
     /* Look and movement are separate jobs, so they get separate tabs; the
        output row stays under both. */
@@ -80,7 +80,7 @@
       color: var(--ink-muted); }
     .tabs button:hover { background: none; color: var(--ink); }
     .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--c-olive); }
-    .tabpanel[hidden] { display: none; }
+    .tabpanel[hidden], aside [hidden] { display: none; }
 
     label { display: block; margin-bottom: 10px; }
     label > span { display: flex; justify-content: space-between; align-items: baseline;
@@ -92,11 +92,11 @@
     input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
       background: var(--accent-soft); }
     input[type=range]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px;
-      margin-top: -5px; border: 2px solid var(--c-white); border-radius: 50%;
+      margin-top: -5px; border: none; border-radius: 50%;
       background: var(--c-olive); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
     input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--accent-soft); }
     input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--c-olive); }
-    input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--c-white);
+    input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none;
       border-radius: 50%; background: var(--c-olive); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 
     select, input[type=number] { width: 100%; padding: 6px 8px; border: 1px solid var(--border);
@@ -172,9 +172,9 @@
       <label><span>Height</span>
         <input type="number" id="ph" min="200" max="4000" step="10" value="1000" /></label>
     </div>
-    <label><span>Ground <b id="v-bg"></b></span><div class="swatches" id="bgSw"></div></label>
-    <label><span>Thread <b id="v-ink"></b></span><div class="swatches" id="inkSw"></div></label>
-    <button id="alphaBtn" style="width:100%">Transparent ground</button>
+    <label><span>Background <b id="v-bg"></b></span><div class="swatches" id="bgSw"></div></label>
+    <label><span>Particles <b id="v-ink"></b></span><div class="swatches" id="inkSw"></div></label>
+    <button id="alphaBtn" style="width:100%">Transparent background</button>
 
     <h2>Grid</h2>
     <label><span>Columns <b id="v-cols"></b></span>
@@ -185,13 +185,9 @@
       <input id="scatter" type="range" min="0" max="1.5" step="0.05" value="0" /></label>
     <label><span>Vary <b id="v-vary"></b></span>
       <input id="vary" type="range" min="0" max="0.9" step="0.05" value="0" /></label>
-    <label><span>Offset <b id="v-offset"></b></span>
-      <input id="offset" type="range" min="0" max="1" step="0.05" value="0" /></label>
-    <label><span>Relief <b id="v-relief"></b></span>
-      <input id="relief" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
     <label><span>Swell <b id="v-swell"></b></span>
       <input id="swell" type="range" min="0" max="0.8" step="0.05" value="0.3" /></label>
-    <label><span>Softness <b id="v-soft"></b></span>
+    <label><span>Blur <b id="v-soft"></b></span>
       <input id="soft" type="range" min="0" max="3" step="0.1" value="0.8" /></label>
     <label><span>Dither <b id="v-dither"></b></span>
       <input id="dither" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
@@ -211,7 +207,7 @@
       </div>
     </label>
     <div class="row"><button id="shuffle">Shuffle</button><button id="copyLink">Copy link</button></div>
-    <label style="margin-top:8px"><span>Symmetry</span><select id="symmetry">
+    <label id="symmetryRow" style="margin-top:8px"><span>Symmetry</span><select id="symmetry">
       <option value="mirror4">mirrored — both axes</option>
       <option value="none">none — a single spray</option>
       <option value="mirrorX">mirrored — one axis</option>
@@ -219,7 +215,7 @@
       <option value="kaleido8">kaleidoscope — eight</option>
       <option value="tile">half-drop repeat</option>
     </select></label>
-    <label id="repeatRow" style="display:none"><span>Repeat <b id="v-repeat"></b></span>
+    <label id="repeatRow" hidden><span>Repeat <b id="v-repeat"></b></span>
       <input id="repeat" type="range" min="2" max="10" step="1" value="4" /></label>
     <label style="margin-top:8px"><span>Source</span><select id="source">
       <option value="motif">generated motif</option>
@@ -228,25 +224,31 @@
     </select></label>
     <div class="row">
       <button id="upload">Upload image…</button>
-      <button id="invert" data-on="false">Invert</button>
+      <button id="invert" data-on="false" data-for="image">Invert</button>
     </div>
-    <label style="margin-top:8px"><span>Read as</span><select id="read">
+    <label data-for="image" style="margin-top:8px"><span>Read as</span><select id="read">
       <option value="edges">edges — linework</option>
       <option value="tone">tone — light and dark</option>
     </select></label>
-    <label><span>Image zoom <b id="v-zoom"></b></span>
+    <label id="zoomRow"><span>Image zoom <b id="v-zoom"></b></span>
       <input id="zoom" type="range" min="0.4" max="3" step="0.05" value="1" /></label>
     <input type="file" id="file" accept="image/*" hidden />
-    <label style="margin-top:8px"><span>Stems <b id="v-stems"></b></span>
+
+    <div data-for="motif">
+    <h2>Branches</h2>
+    <label><span>Stems <b id="v-stems"></b></span>
       <input id="stems" type="range" min="1" max="9" step="1" value="5" /></label>
     <label><span>Spread <b id="v-spread"></b></span>
       <input id="spread" type="range" min="0" max="1" step="0.02" value="0.38" /></label>
     <label><span>Leafiness <b id="v-leafiness"></b></span>
       <input id="leafiness" type="range" min="0" max="2" step="0.05" value="0.9" /></label>
+
+    <h2>Center piece</h2>
     <label><span>Medallion <b id="v-medallion"></b></span>
       <input id="medallion" type="range" min="0" max="0.7" step="0.02" value="0.26" /></label>
     <label><span>Petals <b id="v-petals"></b></span>
       <input id="petals" type="range" min="3" max="16" step="1" value="8" /></label>
+    </div>
 
     <h2>Border</h2>
     <div class="row">
@@ -266,7 +268,6 @@
 
     <div class="tabpanel" id="tab-motion" role="tabpanel" hidden>
     <label><select id="motion">
-      <option value="none">still</option>
       <option value="branch">branch — grows out from the middle along its arms</option>
       <option value="gather">gather — stitches fly in and settle into the shape</option>
       <option value="weight">weight — the faint parts go first, the dense last</option>
@@ -281,6 +282,8 @@
       <option value="settle">settle — the shortest move each can make</option>
       <option value="swap">swap — from anywhere on the grid</option>
     </select></label>
+    <label id="lagRow"><span>Offset <b id="v-lag"></b></span>
+      <input id="lag" type="range" min="0" max="6" step="0.25" value="0" /></label>
     <label><span>Steps <b id="v-steps"></b></span>
       <input id="steps" type="range" min="4" max="40" step="1" value="15" /></label>
     <label><span>Flare <b id="v-flare"></b></span>
@@ -334,10 +337,10 @@ for (const tab of document.querySelectorAll(".tabs [role=tab]")) {
   });
 }
 
-// The working palette, off the studio sheet, with a grey ramp under it. Fixed
-// swatches rather than a colour picker: these are the colours the work is in.
+// The working palette, off the studio sheet and nothing besides — fixed
+// swatches rather than a colour picker, because these are the colours the work
+// is in. A grey ramp used to sit under it; greys were never on the sheet.
 const PALETTE = ["#fbf4dd", "#fff278", "#86842d", "#403b12", "#2a2a2a", "#181818", "#ffffff"];
-const GREYS = ["#e8e8e8", "#c4c4c4", "#9a9a9a", "#6e6e6e", "#484848", "#242424", "#000000"];
 const download = (href, name) => {
   const a = document.createElement("a");
   a.download = name;
@@ -360,7 +363,7 @@ const S = {
   border: true, corners: true,
   inset: 0.02, bands: 2, // the frame's own proportions, fixed
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
-  motion: "none", fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
+  motion: "branch", lag: 0, fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
 };
 
 let grid = null;
@@ -571,6 +574,7 @@ function draw(frame = null) {
       loosen: frame.emerge ? 1 : 0.3,
       stagger: frame.stagger ?? 0,
       emerge: !!frame.emerge, relief: S.relief, swell: S.swell,
+      latePhase: frame.latePhase ?? null, lateSeed: S.seed,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.speckle, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
@@ -893,6 +897,13 @@ function frameAt(n) {
   return f ? { ...f, tick: n } : (S.offset > 0 ? { tick: n } : null);
 }
 
+// Offset is in seconds, so it holds its length when the frame rate changes
+const lagFrames = () => Math.round(S.lag * Math.max(1, S.fps));
+// only the motions that walk stitches in have a second wave to hold back
+function motionRows() {
+  $("lagRow").hidden = S.motion !== "branch" && S.motion !== "gather";
+}
+
 function frameFor(n) {
   const amt = S.amount;
   // seconds, not frames — so fps changes how choppy it is, not how fast
@@ -932,9 +943,12 @@ function frameFor(n) {
       // holds before starting over.
       const steps = Math.max(2, Math.round(S.steps));
       const hold = Math.max(1, Math.round((0.5 + amt * 6) * S.fps));
-      const cycle = steps + hold;
-      const step = Math.min(steps, ((n % cycle) + cycle) % cycle);
-      return { loose: branchStitches(), phase: step / steps, emerge: true, stagger: 0.85 };
+      const lag = lagFrames();
+      const cycle = steps + lag + hold;
+      const k = ((n % cycle) + cycle) % cycle;
+      const at = (j) => Math.max(0, Math.min(steps, j)) / steps;
+      return { loose: branchStitches(), phase: at(k), latePhase: lag ? at(k - lag) : null,
+        emerge: true, stagger: 0.85 };
     }
     case "gather": {
       // Counted in frames rather than seconds: one step per frame, so Steps is
@@ -954,23 +968,29 @@ function frameFor(n) {
         // A series walks one picture's stitches into the next and on to the
         // one after, so each leg is a journey and a hold — there is nothing to
         // come back out to, the way there is with a single pattern.
-        const leg = steps + hold;
+        const lag = lagFrames();
+        const leg = steps + lag + hold;
         const total = leg * seqGrids.length;
         const k = ((n % total) + total) % total;
         const i = Math.floor(k / leg);
-        const step = Math.min(steps, k % leg);
-        return { loose: loosePair(i), phase: shape(step) };
+        const at = (j) => shape(Math.max(0, Math.min(steps, j)));
+        return { loose: loosePair(i), phase: at(k % leg), latePhase: lag ? at(k % leg - lag) : null };
       }
 
       const g = looseStitches();
-      const cycle = steps * 2 + hold * 2;
+      // With an offset the run in is longer by it, and the run out is the run
+      // in played backwards: the late ones leave first.
+      const lag = lagFrames();
+      const run = steps + lag;
+      const cycle = run * 2 + hold * 2;
       const k = ((n % cycle) + cycle) % cycle;
-      let step;
-      if (k < steps) step = k;                                   // closing in
-      else if (k < steps + hold) step = steps;                   // arranged
-      else if (k < steps * 2 + hold) step = steps - (k - steps - hold); // opening out
-      else step = 0;                                             // back in the grid
-      return { loose: g, phase: shape(step) };
+      let j;
+      if (k < run) j = k;                                  // closing in
+      else if (k < run + hold) j = run;                    // arranged
+      else if (k < run * 2 + hold) j = run - (k - run - hold); // opening out
+      else j = 0;                                          // back in the grid
+      const at = (x) => shape(Math.max(0, Math.min(steps, x)));
+      return { loose: g, phase: at(j), latePhase: lag ? at(j - lag) : null };
     }
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, tt) => Math.sin(tt * 2 - cov * 7) * amt * 0.3);
@@ -1007,7 +1027,7 @@ function stopMotion() {
 }
 
 function startMotion() {
-  if (S.motion === "none" || !grid) return;
+  if (!grid) return;
   anim.on = true;
   anim.beat = 0;
   anim.last = performance.now();
@@ -1042,10 +1062,10 @@ new ResizeObserver(fit).observe($("stageWrap"));
 const f2 = (v) => v.toFixed(2);
 const SLIDERS = [
   ["fps", "fps", true], ["amount", "amount", true, f2], ["flare", "flare", true, f2],
-  ["steps", "steps", true],
+  ["steps", "steps", true], ["lag", "lag", true, (v) => v.toFixed(2) + "s"],
   ["cols", "cols", false], ["gap", "gap", true, f2], 
-  ["soft", "soft", true, f2], ["relief", "relief", true, f2], ["swell", "swell", true, f2],
-  ["offset", "offset", true, f2], ["scatter", "scatter", true, f2],
+  ["soft", "soft", true, f2], ["swell", "swell", true, f2],
+  ["scatter", "scatter", true, f2],
   ["vary", "vary", true, f2],
   ["grain", "grain", true, f2], ["mottle", "mottle", true, f2],
   ["speckle", "speckle", true, f2],
@@ -1087,16 +1107,17 @@ function syncControls() {
   $("transition").value = S.transition;
   amountLabel();
   markSwatches();
-  $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
+  sourceRows();
+  motionRows();
   for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
     ["alphaBtn", "alpha"], ["invert", "invert"]]) $(id).dataset.on = String(S[key]);
   stage.classList.toggle("alpha", S.alpha);
 }
 
 // a seed is only worth having if you can get back to it
-const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness",
+const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "lag", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness",
   "medallion", "petals", "cols", "gap", "dither", "threshold",
-  "contrast", "border", "corners", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
+  "contrast", "border", "corners", "bg", "ink", "alpha", "w", "h", "soft", "swell", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -1117,10 +1138,23 @@ function readHash() {
   }
   return any;
 }
+// Only the controls that act on what is being stitched: the branch and
+// medallion sliders do nothing to a picture, and the picture's own settings
+// nothing to the motif. Symmetry and zoom only reach a picture when it is laced.
+function sourceRows() {
+  const image = S.source !== "motif" && !!S.image;
+  for (const el of document.querySelectorAll("[data-for]"))
+    el.hidden = el.dataset.for !== (image ? "image" : "motif");
+  const flat = image && S.source === "image";
+  $("symmetryRow").hidden = flat;
+  $("repeatRow").hidden = flat || S.symmetry !== "tile";
+  $("zoomRow").hidden = !image || flat;
+}
 $("source").addEventListener("change", (e) => {
   S.source = e.target.value;
   if (S.source !== "motif" && !S.image) $("file").click();
   else build();
+  sourceRows();
   writeHash();
 });
 $("read").addEventListener("change", (e) => { S.read = e.target.value; build(); writeHash(); });
@@ -1139,15 +1173,15 @@ $("transition").addEventListener("change", (e) => {
 });
 $("motion").addEventListener("change", (e) => {
   S.motion = e.target.value;
+  motionRows();
   amountLabel();
   stopMotion();
-  if (S.motion !== "none") startMotion();
+  startMotion();
   writeHash();
 });
 $("play").addEventListener("click", () => (anim.on ? stopMotion() : startMotion()));
 $("record").addEventListener("click", async (e) => {
   const btn = e.currentTarget;
-  if (S.motion === "none") { S.motion = "ripple"; $("motion").value = "ripple"; }
   if (!anim.on) startMotion();
   const stream = stage.captureStream(Math.max(S.fps, 12));
   // mp4 first — it is what the social apps take without converting
@@ -1274,7 +1308,7 @@ $("fileB").addEventListener("change", async (e) => {
   e.target.value = "";
   renderSeq();
   seqLabel();
-  if (S.motion !== "morph") { S.motion = "morph"; $("motion").value = "morph"; }
+  if (S.motion !== "morph") { S.motion = "morph"; $("motion").value = "morph"; motionRows(); }
   build();
   stopMotion();
   if (S.seq.length > 1) startMotion();
@@ -1295,7 +1329,7 @@ $("clearMorphImg").addEventListener("click", () => {
 $("file").addEventListener("change", (e) => e.target.files[0] && loadImage(e.target.files[0]));
 $("symmetry").addEventListener("change", (e) => {
   S.symmetry = e.target.value;
-  $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
+  sourceRows();
   build();
   writeHash();
 });
@@ -1315,7 +1349,7 @@ $("copyLink").addEventListener("click", async (e) => {
 function buildSwatches(hostId, key) {
   const host = $(hostId);
   host.innerHTML = "";
-  for (const hex of [...PALETTE, ...GREYS]) {
+  for (const hex of PALETTE) {
     const b = document.createElement("button");
     b.style.background = hex;
     b.title = hex.toUpperCase();
@@ -1406,6 +1440,7 @@ function loadImage(file) {
     S.image = img;
     if (S.source === "motif") S.source = "imageLace"; // laced is the interesting one
     $("source").value = S.source;
+    sourceRows();
     URL.revokeObjectURL(url);
     build();
     writeHash();
@@ -1424,6 +1459,9 @@ addEventListener("drop", (e) => {
 
 hashLock = true;
 readHash();
+// Still is simply not playing, so it is no longer a motion of its own; links
+// made when it was come back on the default.
+if (S.motion === "none") S.motion = "branch";
 syncControls();
 hashLock = false;
 setSize(S.w, S.h); // also resizes, builds and records the aspect

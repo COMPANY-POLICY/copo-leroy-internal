@@ -886,14 +886,20 @@ export function drawLoose(ctx, items, o) {
     relief = 0, swell = 0, offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
     scatter = 0, vary = 0, printSeed = 0,
     emerge = false, // a stitch that has not had its turn is not there at all
+    // A second wave: a random share of the stitches runs on its own phase,
+    // so they arrive after the rest rather than with them.
+    latePhase = null, lateShare = 0.5, lateSeed = 0,
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
   const snap = cw > 0 && ch > 0;
-  for (const it of items) {
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const late = latePhase !== null &&
+      (Math.imul(i ^ lateSeed, 2654435761) >>> 0) / 4294967296 < lateShare;
     // linear, and by default everything moves together: the point is that each
     // frame is the whole set a step closer, not a scatter of arrival times
-    const e = Math.max(0, Math.min(1, (phase - it.delay * stagger) / span));
+    const e = Math.max(0, Math.min(1, ((late ? latePhase : phase) - it.delay * stagger) / span));
     // A growing stitch is simply there or it is not: no easing in, by size or
     // by opacity. Something dividing appears whole.
     if (emerge && e <= 0) continue;
