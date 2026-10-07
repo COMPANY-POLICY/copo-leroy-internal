@@ -284,12 +284,11 @@
 
     <h2>Border
       <label class="switch"><input type="checkbox" id="borderSw" aria-label="Border" checked /><span class="track"></span></label></h2>
-    <div class="row">
-      <button id="cornersBtn" data-on="true">Corners</button>
-    </div>
+    <label class="switch"><span>Corners</span>
+      <input type="checkbox" id="cornersSw" checked /><span class="track"></span></label>
 
     <h2>Riso
-      <label class="switch"><input type="checkbox" id="risoSw" aria-label="Riso" checked /><span class="track"></span></label></h2>
+      <label class="switch"><input type="checkbox" id="risoSw" aria-label="Riso" /><span class="track"></span></label></h2>
     <label><span>Grain <b id="v-grain"></b></span>
       <input id="grain" type="range" min="0" max="1" step="0.05" value="0.2" /></label>
     <label><span>Mottle <b id="v-mottle"></b></span>
@@ -303,6 +302,10 @@
     </div>
 
     <div class="tabpanel" id="tab-motion" role="tabpanel" hidden>
+    <div class="row" id="motionTarget" style="margin-bottom:10px">
+      <button data-target="lace" data-on="true">Lace</button>
+      <button data-target="logo" data-on="false">Logo</button>
+    </div>
     <label><select id="motion">
       <option value="branch">branch — grows out from the middle along its arms</option>
       <option value="gather">gather — stitches fly in and settle into the shape</option>
@@ -322,13 +325,13 @@
       <input id="lag" type="range" min="0" max="6" step="0.25" value="0" /></label>
     <label><span>Steps <b id="v-steps"></b></span>
       <input id="steps" type="range" min="4" max="40" step="1" value="15" /></label>
-    <label><span>Flare <b id="v-flare"></b></span>
+    <label id="flareRow"><span>Flare <b id="v-flare"></b></span>
       <input id="flare" type="range" min="0" max="1.5" step="0.05" value="0.6" /></label>
     <label><span>Frames per second <b id="v-fps"></b></span>
       <input id="fps" type="range" min="2" max="24" step="1" value="8" /></label>
     <label><span id="amountLabel">Amount <b id="v-amount"></b></span>
       <input id="amount" type="range" min="0.05" max="1" step="0.05" value="0.4" /></label>
-    <div class="row">
+    <div class="row" id="morphRow">
       <button id="morphImg">Add images…</button>
       <button id="fitAll">Fit each</button>
       <button id="clearMorphImg">Clear</button>
@@ -347,6 +350,7 @@
     <h2>Look</h2>
     <input type="checkbox" id="lg-alpha" hidden />
     <label><select id="lg-preset">
+      <option value="archadia">archadia — the house look</option>
       <option value="contour">contour cloud — dots trace the edges</option>
       <option value="wordmark">wordmark — solid letters and spray</option>
       <option value="custom">custom</option>
@@ -387,8 +391,6 @@
     <div>
     <label><span>Letter width <b id="lg-vWide"></b></span>
       <input type="range" id="lg-wide" min="40" max="260" value="60" /></label>
-    <label><span>Letter size <b id="lg-vSize"></b></span>
-      <input type="range" id="lg-size" min="40" max="150" value="96" /></label>
     <label><span>Tracking <b id="lg-vTrack"></b></span>
       <input type="range" id="lg-track" min="-120" max="300" value="0" /></label>
     </div>
@@ -490,18 +492,33 @@ for (const tab of document.querySelectorAll(".tabs [role=tab]")) {
       t.setAttribute("aria-selected", on);
       $(`tab-${t.dataset.tab}`).hidden = !on;
     }
-    // The logo is a separate piece of work with its own canvas, so its tab
-    // swaps the stage too, and puts away what only applies to the lace.
     document.querySelector("aside").scrollTop = 0;
-    const logo = tab.dataset.tab === "logo";
-    $("logoStage").hidden = !logo;
-    stage.hidden = logo;
-    $("info").hidden = logo;
-    if (logo) {
-      stopMotion();
-      logoLoaded ??= import(`./logo.js?t=${Date.now()}`); // built the first time it is asked for
-    }
+    // Motion animates whichever piece you came from
+    if (tab.dataset.tab !== "motion") setTarget(tab.dataset.tab === "logo" ? "logo" : "lace");
+    else showStage();
   });
+}
+for (const b of $("motionTarget").children) b.addEventListener("click", () => setTarget(b.dataset.target));
+
+// The logo is a separate piece of work with its own canvas, so showing it
+// swaps the stage, and puts away what only applies to the lace.
+let target = "lace", logoMod = null;
+async function setTarget(t) {
+  if (t !== target) stopMotion();
+  target = t;
+  for (const b of $("motionTarget").children) b.dataset.on = String(b.dataset.target === t);
+  if (t === "logo") {
+    logoLoaded ??= import(`./logo.js?t=${Date.now()}`); // built the first time it is asked for
+    logoMod = await logoLoaded;
+  }
+  showStage();
+  motionRows();
+}
+function showStage() {
+  const logo = target === "logo" && $("tab-design").hidden;
+  $("logoStage").hidden = !logo;
+  stage.hidden = logo;
+  $("info").hidden = logo;
 }
 
 // The working palette, off the studio sheet and nothing besides — fixed
@@ -521,13 +538,13 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 220, gap: 0.18, levels: 3, dither: 0.35, soft: 0.8, relief: 0.35, swell: 0.3, offset: 0, scatter: 0, vary: 0,
+  cols: 220, gap: 0.18, levels: 3, dither: 0.35, soft: 0.8, relief: 0, swell: 0.3, offset: 0, scatter: 0, vary: 0,
   grain: 0.2, mottle: 0.45, speckle: 0.05,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
   stems: 5, spread: 0.38, leafiness: 0.9, medallion: 0.26, petals: 8,
   weight: 0.5, // the motif's stroke, fixed — no longer a control
-  border: true, corners: true, riso: true,
+  border: true, corners: true, riso: false,
   inset: 0.02, bands: 2, // the frame's own proportions, fixed
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
   motion: "branch", lag: 0, fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
@@ -1070,6 +1087,12 @@ function frameAt(n) {
 const lagFrames = () => Math.round(S.lag * Math.max(1, S.fps));
 // only the motions that walk stitches in have a second wave to hold back
 function motionRows() {
+  // the logo is a single piece, so there is no series for it to morph through
+  const logo = target === "logo";
+  const morph = $("motion").querySelector('[value="morph"]');
+  morph.hidden = morph.disabled = logo;
+  if (logo && S.motion === "morph") { S.motion = "branch"; $("motion").value = "branch"; amountLabel(); }
+  for (const id of ["flareRow", "morphRow", "seqList"]) $(id).hidden = logo;
   $("lagRow").hidden = S.motion !== "branch" && S.motion !== "gather";
 }
 
@@ -1192,11 +1215,12 @@ function stopMotion() {
   cancelAnimationFrame(anim.raf);
   $("play").dataset.on = "false";
   $("play").textContent = "Play";
-  draw();
+  if (target === "logo") logoMod?.still();
+  else draw();
 }
 
 function startMotion() {
-  if (!grid) return;
+  if (target === "logo" ? !logoMod : !grid) return;
   anim.on = true;
   anim.beat = 0;
   anim.last = performance.now();
@@ -1207,7 +1231,8 @@ function startMotion() {
     anim.raf = requestAnimationFrame(step);
     if (now - anim.last < 1000 / S.fps) return; // hold each frame — it is stop motion
     anim.last = now;
-    draw(frameAt(anim.beat++));
+    if (target === "logo") logoMod.frame(anim.beat++, S);
+    else draw(frameAt(anim.beat++));
   };
   anim.raf = requestAnimationFrame(step);
 }
@@ -1278,8 +1303,8 @@ function syncControls() {
   markSwatches();
   sourceRows();
   motionRows();
-  for (const [id, key] of [["cornersBtn", "corners"], ["invert", "invert"]])
-    $(id).dataset.on = String(S[key]);
+  for (const [id, key] of [["invert", "invert"]]) $(id).dataset.on = String(S[key]);
+  $("cornersSw").checked = !!S.corners;
   $("borderSw").checked = !!S.border;
   $("risoSw").checked = !!S.riso;
   stage.classList.toggle("alpha", S.alpha);
@@ -1339,7 +1364,8 @@ $("amount").addEventListener("input", amountLabel);
 $("transition").addEventListener("change", (e) => {
   S.transition = e.target.value;
   loose = null; // the starting positions are what changes
-  if (!anim.on) draw(S.motion === "gather" ? frameAt(0) : null);
+  if (!anim.on && target === "logo") S.motion === "gather" ? logoMod.frame(0, S) : logoMod.still();
+  else if (!anim.on) draw(S.motion === "gather" ? frameAt(0) : null);
   writeHash();
 });
 $("motion").addEventListener("change", (e) => {
@@ -1354,7 +1380,8 @@ $("play").addEventListener("click", () => (anim.on ? stopMotion() : startMotion(
 $("record").addEventListener("click", async (e) => {
   const btn = e.currentTarget;
   if (!anim.on) startMotion();
-  const stream = stage.captureStream(Math.max(S.fps, 12));
+  const logo = target === "logo";
+  const stream = (logo ? logoMod.canvas : stage).captureStream(Math.max(S.fps, 12));
   // mp4 first — it is what the social apps take without converting
   const types = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
   const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t));
@@ -1365,7 +1392,7 @@ $("record").addEventListener("click", async (e) => {
   rec.onstop = () => {
     const ext = mimeType.includes("mp4") ? "mp4" : "webm";
     const url = URL.createObjectURL(new Blob(chunks, { type: mimeType }));
-    download(url, `pixel-lace-${S.w}x${S.h}.${ext}`);
+    download(url, logo ? `${logoMod.recordingName()}.${ext}` : `pixel-lace-${S.w}x${S.h}.${ext}`);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     btn.textContent = "Record 5s";
     btn.dataset.on = "false";
@@ -1585,6 +1612,11 @@ $("borderSw").addEventListener("change", (e) => {
   build(); // the frame is part of the motif, so the grid is remade
   writeHash();
 });
+$("cornersSw").addEventListener("change", (e) => {
+  S.corners = e.target.checked;
+  build();
+  writeHash();
+});
 $("risoSw").addEventListener("change", (e) => {
   // the sliders keep their values; this only decides whether they are applied
   S.riso = e.target.checked;
@@ -1597,7 +1629,6 @@ const toggle = (id, key) => $(id).addEventListener("click", (e) => {
   build();
   writeHash();
 });
-toggle("cornersBtn", "corners");
 toggle("invert", "invert");
 $("save").addEventListener("click", () =>
   download(stage.toDataURL("image/png"), `pixel-lace-${stage.width}x${stage.height}.png`));

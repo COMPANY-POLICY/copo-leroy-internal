@@ -187,7 +187,7 @@ function render(){
   const GRAIN  = +$('grain').value/100;
   const DOT    = +$('dotpx').value;        // raster dot size, in px
   const WIDE   = +$('wide').value/100;
-  const FILL   = +$('size').value/100;
+  const FILL   = 1;   // set as large as it comes; fitInk brings it inside the margin
   const TRACK  = +$('track').value;
   const ALIGN  = $('align').value;
   const MODE   = $('mode').value;          // 'all' | 'in' | 'out' | 'both'
@@ -450,12 +450,16 @@ $('dlSvg').onclick = () => {
 
 /* ---------- presets ---------- */
 const PRESETS = {
+  // the house look, and what the tab opens on
+  archadia: {mode:'all', edge:100, core:63, solid:37, grad:26, graddir:'lr', outw:100,
+             spray:165, swirl:52, scale:19, ink:247, grain:43, dotpx:3, n:900,
+             dx:44, dy:-2, seed:412, inkc:'#fff278', bgc:'#403b12'},
   // dots trace the contour of the form and the interior stays open
-  contour:  {mode:'all', edge:100, solid:0,  grad:30, outw:100, spray:70,  swirl:120,
+  contour:  {mode:'all', edge:100, core:0, solid:0,  grad:30, outw:100, spray:70,  swirl:120,
              scale:40, ink:70,  grain:55, dotpx:2, n:600, dx:0,  dy:0,
              inkc:'#fff278', bgc:'#403b12'},   // the studio's yellow on dark olive
   // the letterform reads solid, with spray coming off it
-  wordmark: {mode:'all', edge:12,  solid:45, grad:65, outw:60,  spray:127, swirl:160,
+  wordmark: {mode:'all', edge:12, core:0, solid:45, grad:65, outw:60,  spray:127, swirl:160,
              scale:59, ink:163, grain:41, dotpx:2, n:900, dx:7,  dy:32,
              inkc:'#181818', bgc:'#ffffff'}
 };
@@ -499,7 +503,7 @@ $('src').addEventListener('change', () => {
   logoRows();
   if($('src').value === 'image' && !IMG) $('imgFile').click();
 });
-const readouts = {n:'vN',spray:'vSpray',swirl:'vSwirl',scale:'vScale',dx:'vDx',dy:'vDy',edge:'vEdge',core:'vCore',ink:'vInk',grain:'vGrain',dotpx:'vDotpx',outw:'vOut',solid:'vSolid',grad:'vGrad',wide:'vWide',size:'vSize',track:'vTrack',thr:'vThr',pad:'vPad'};
+const readouts = {n:'vN',spray:'vSpray',swirl:'vSwirl',scale:'vScale',dx:'vDx',dy:'vDy',edge:'vEdge',core:'vCore',ink:'vInk',grain:'vGrain',dotpx:'vDotpx',outw:'vOut',solid:'vSolid',grad:'vGrad',wide:'vWide',track:'vTrack',thr:'vThr',pad:'vPad'};
 function syncLabels(){ for(const k in readouts) $(readouts[k]).textContent = $(k).value; markSwatches(); }
 
 // Colour off the same fixed palette as the Design tab, read from its swatches
@@ -550,8 +554,152 @@ $('imgFile').onchange = ev => {
   const f = ev.target.files[0]; if(!f) return;
   loadImage(URL.createObjectURL(f), f.name);
 };
-applyPreset('contour');
+applyPreset('archadia');
 syncLabels();
 logoRows();
 document.fonts.ready.then(go);
 go();
+
+/* ---------- motion ----------
+   The Motion tab's moves, on the logo's dots instead of the lace's stitches.
+   Frames are counted the same way, so Steps, Offset, Amount and frames per
+   second mean here what they mean there. Morph has no counterpart: it walks a
+   series of pictures, and the logo is one. */
+const h01 = (i, k) => (Math.imul(i + k, 2246822519 ^ Math.imul(k, 374761393)) >>> 0) / 4294967296;
+let MO = null;
+function motionDots(M){
+  if(MO && MO.last === LAST && MO.transition === M.transition) return MO;
+  const {W, H} = LAST;
+  const dots = [];
+  geometry().dots((x, y, r) => dots.push({tx:x, ty:y, r, sx:x, sy:y}));
+  const n = dots.length;
+
+  // Branch: outward from the middle of the ink, the edge left ragged by noise
+  // so it grows rather than expanding as a ring.
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  for(const d of dots){ x0 = Math.min(x0, d.tx); x1 = Math.max(x1, d.tx); y0 = Math.min(y0, d.ty); y1 = Math.max(y1, d.ty); }
+  const cx = (x0 + x1)/2, cy = (y0 + y1)/2, maxR = Math.hypot(x1 - cx, y1 - cy) || 1;
+  // Weight: how crowded each dot's neighbourhood is, so the sparse spray can
+  // go first and the solid letters last.
+  const B = 24, bw = Math.ceil(W/B), bins = new Uint16Array(bw * Math.ceil(H/B));
+  for(const d of dots) bins[((d.ty/B)|0)*bw + ((d.tx/B)|0)]++;
+  let top = 1; for(const v of bins) top = Math.max(top, v);
+  dots.forEach((d, i) => {
+    const radial = Math.hypot(d.tx - cx, d.ty - cy)/maxR;
+    d.delay = Math.min(1, radial*0.8 + vnoise(d.tx*0.012, d.ty*0.012)*0.2);
+    d.dens = bins[((d.ty/B)|0)*bw + ((d.tx/B)|0)]/top;
+    d.i = i;
+  });
+
+  // Gather: where each dot waits before it walks in, by the same transitions.
+  const kind = M.transition;
+  const gc = Math.max(1, Math.round(Math.sqrt(n * W/H))), gr = Math.max(1, Math.ceil(n/gc));
+  const stepX = W/gc, stepY = H/gr;
+  if(kind === 'fall'){
+    for(const d of dots){ d.sx = d.tx; d.sy = d.ty - H*(0.35 + (Math.floor(d.tx/(W/60)) % 3)*0.22); }
+  } else if(kind === 'edges'){
+    for(const d of dots){ d.sx = d.tx < W/2 ? d.tx - W*0.55 : d.tx + W*0.55; d.sy = d.ty; }
+  } else if(kind === 'settle'){   // the nearest point of the even grid: the shortest move each can make
+    for(const d of dots){
+      d.sx = (Math.floor(d.tx/stepX) + 0.5)*stepX;
+      d.sy = (Math.floor(d.ty/stepY) + 0.5)*stepY;
+    }
+  } else {
+    const slots = [];
+    for(let r=0;r<gr;r++){
+      const inRow = Math.min(gc, n - r*gc); if(inRow <= 0) break;
+      const pad = (gc - inRow)/2;
+      for(let c=0;c<inRow;c++) slots.push([(c + pad + 0.5)*stepX, (r + 0.5)*stepY]);
+    }
+    if(kind === 'swap'){   // no pairing at all
+      let z = 0x2545f491;
+      const rand = () => (z = (Math.imul(z, 1664525) + 1013904223) >>> 0)/4294967296;
+      for(let i=slots.length-1;i>0;i--){ const j = (rand()*(i+1))|0; [slots[i], slots[j]] = [slots[j], slots[i]]; }
+      dots.forEach((d, i) => { d.sx = slots[i][0]; d.sy = slots[i][1]; });
+    } else {               // contract and corner: paired along a Hilbert curve
+      const SIDE = 256;
+      const hil = (px, py) => {
+        let x = Math.max(0, Math.min(SIDE-1, Math.floor(px/W*SIDE)));
+        let y = Math.max(0, Math.min(SIDE-1, Math.floor(py/H*SIDE)));
+        let d = 0;
+        for(let s=SIDE/2;s>0;s/=2){
+          const rx = (x & s) > 0 ? 1 : 0, ry = (y & s) > 0 ? 1 : 0;
+          d += s*s*((3*rx) ^ ry);
+          if(ry === 0){ if(rx === 1){ x = s-1-x; y = s-1-y; } const t = x; x = y; y = t; }
+        }
+        return d;
+      };
+      const order = dots.map((_, i) => i).sort((a, b) => hil(dots[a].tx, dots[a].ty) - hil(dots[b].tx, dots[b].ty));
+      slots.sort((a, b) => hil(a[0], a[1]) - hil(b[0], b[1]));
+      order.forEach((idx, k) => { const s = slots[k] || slots[slots.length-1]; dots[idx].sx = s[0]; dots[idx].sy = s[1]; });
+    }
+  }
+  MO = {last: LAST, transition: kind, dots};
+  return MO;
+}
+
+// One frame of motion M (the lace's own settings object) onto the preview.
+export function frame(n, M){
+  if(!LAST) return;
+  const {dots} = motionDots(M);
+  const fps = Math.max(1, M.fps), amt = M.amount, t = n/fps;
+  const steps = Math.max(2, Math.round(M.steps));
+  const lag = (M.motion === 'branch' || M.motion === 'gather') ? Math.round(M.lag * fps) : 0;
+  const late = (d) => lag > 0 && h01(d.i, 97) < 0.5;   // the half held back by Offset
+  const at = (j) => Math.max(0, Math.min(steps, j));
+  const marks = [];   // [x, y, r, alpha]
+
+  if(M.motion === 'branch'){
+    // grows and stays; Amount is how long it holds before starting again
+    const hold = Math.max(1, Math.round((0.5 + amt*6)*fps));
+    const cycle = steps + lag + hold, k = ((n % cycle) + cycle) % cycle;
+    const p0 = at(k)/steps, p1 = at(k - lag)/steps;
+    for(const d of dots) if((late(d) ? p1 : p0) - d.delay*0.85 > 0) marks.push([d.tx, d.ty, d.r, 1]);
+  } else if(M.motion === 'gather'){
+    const hold = Math.max(1, Math.round((0.4 + amt*3)*fps));
+    const shape = (s) => 1 - Math.pow(1 - s/steps, 1.55);
+    const run = steps + lag, cycle = run*2 + hold*2, k = ((n % cycle) + cycle) % cycle;
+    const j = k < run ? k : k < run + hold ? run : k < run*2 + hold ? run - (k - run - hold) : 0;
+    const e0 = shape(at(j)), e1 = shape(at(j - lag));
+    const corner = M.transition === 'corner';
+    for(const d of dots){
+      const e = late(d) ? e1 : e0;
+      const ex = corner ? Math.min(1, e*2) : e, ey = corner ? Math.max(0, e*2 - 1) : e;
+      marks.push([d.sx + (d.tx - d.sx)*ex, d.sy + (d.ty - d.sy)*ey, d.r, 1]);
+    }
+  } else if(M.motion === 'weight'){
+    // a level rising through the crowding: the sparse dots go first
+    const lvl = amt * (0.5 - 0.5*Math.cos(t*2));
+    for(const d of dots) if(d.dens >= lvl) marks.push([d.tx, d.ty, d.r, 1]);
+  } else if(M.motion === 'breathe'){
+    // random dots fading on their own clocks; Amount is how many take part
+    const share = Math.max(0.02, amt);
+    for(const d of dots){
+      const i = d.i;
+      let a = 1;
+      if(h01(i, 1) <= share){
+        const ph = h01(i, 7)*Math.PI*2, rate = 0.25 + Math.pow(h01(i, 13), 2)*2.6;
+        const depth = 0.25 + Math.pow(h01(i, 23), 1.4)*0.72, curve = 0.45 + Math.pow(h01(i, 31), 1.6)*2.8;
+        a = 1 - depth*(1 - Math.pow(0.5 + 0.5*Math.sin(t*rate + ph), curve));
+      }
+      marks.push([d.tx, d.ty, d.r, a]);
+    }
+  } else { still(); return; }
+
+  const {W, H} = LAST;
+  ctx.clearRect(0, 0, W, H);
+  if(!$('alpha').checked){ ctx.fillStyle = bgColour(); ctx.fillRect(0, 0, W, H); }
+  ctx.fillStyle = inkColour();
+  // fading dots are drawn in a few strengths, one path each
+  const LV = 6, paths = Array.from({length: LV + 1}, () => new Path2D());
+  for(const [x, y, r, a] of marks){
+    const p = paths[Math.round(a*LV)];
+    p.moveTo(x + r, y); p.arc(x, y, r, 0, Math.PI*2);
+  }
+  for(let l=1;l<=LV;l++){ ctx.globalAlpha = l/LV; ctx.fill(paths[l]); }
+  ctx.globalAlpha = 1;
+}
+// back to the finished logo
+export function still(){ paint(ctx, $('alpha').checked); }
+export const canvas = cv;
+export const recordingName = () => fileBase();
