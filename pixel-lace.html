@@ -41,6 +41,23 @@
       padding: 14px 32px; border-bottom: 1px solid var(--border);
       background: var(--bg-elevated); }
     .topnav .wordmark { display: block; height: 30px; width: auto; }
+    .topnav__switches { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+
+    /* What a thing is set to, rather than a button you press: the three that
+       turn a whole part of the panel on or off live up here. */
+    .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      font-size: 0.75rem; color: var(--ink-muted); user-select: none; }
+    .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .switch .track { position: relative; width: 34px; height: 20px; flex: none;
+      border: 1px solid var(--border); border-radius: 999px; background: var(--accent-soft);
+      transition: background .15s, border-color .15s; }
+    .switch .track::after { content: ""; position: absolute; top: 2px; left: 2px;
+      width: 14px; height: 14px; border-radius: 50%; background: var(--c-olive);
+      transition: transform .15s, background .15s; }
+    .switch input:checked + .track { background: var(--c-olive); border-color: var(--c-olive); }
+    .switch input:checked + .track::after { transform: translateX(14px); background: var(--c-white); }
+    .switch input:focus-visible + .track { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+    .switch:hover { color: var(--ink); }
 
     /* rail first, then the stage */
     #wrap { flex: 1; min-height: 0; display: flex; align-items: flex-start; gap: 28px;
@@ -145,6 +162,14 @@
 <body>
 <header class="topnav">
   <img class="wordmark" src="logo.png" alt="Archuedy" />
+  <div class="topnav__switches">
+    <label class="switch"><span>Transparent</span>
+      <input type="checkbox" id="alphaSw" /><span class="track"></span></label>
+    <label class="switch"><span>Border</span>
+      <input type="checkbox" id="borderSw" checked /><span class="track"></span></label>
+    <label class="switch"><span>Riso</span>
+      <input type="checkbox" id="risoSw" checked /><span class="track"></span></label>
+  </div>
 </header>
 
 <div id="wrap">
@@ -174,7 +199,6 @@
     </div>
     <label><span>Background <b id="v-bg"></b></span><div class="swatches" id="bgSw"></div></label>
     <label><span>Particles <b id="v-ink"></b></span><div class="swatches" id="inkSw"></div></label>
-    <button id="alphaBtn" style="width:100%">Transparent background</button>
 
     <h2>Grid</h2>
     <label><span>Columns <b id="v-cols"></b></span>
@@ -252,7 +276,6 @@
 
     <h2>Border</h2>
     <div class="row">
-      <button id="borderBtn" data-on="true">Border</button>
       <button id="cornersBtn" data-on="true">Corners</button>
     </div>
 
@@ -264,6 +287,9 @@
     <label><span>Speckle <b id="v-speckle"></b></span>
       <input id="speckle" type="range" min="0" max="1" step="0.05" value="0.05" /></label>
 
+    <!-- stills only: a motion leaves as a recording, from its own tab -->
+    <h2>Output</h2>
+    <div class="row"><button id="save">Save PNG</button><button id="saveSvg">Save SVG</button></div>
     </div>
 
     <div class="tabpanel" id="tab-motion" role="tabpanel" hidden>
@@ -306,8 +332,6 @@
 
     </div>
 
-    <h2>Output</h2>
-    <div class="row"><button id="save">Save PNG</button><button id="saveSvg">Save SVG</button></div>
     <div style="color:var(--dim); margin-top:8px" id="info">—</div>
   </aside>
   <div id="stageWrap">
@@ -360,7 +384,7 @@ const S = {
   seed: 20260917, symmetry: "mirror4", repeat: 4,
   stems: 5, spread: 0.38, leafiness: 0.9, medallion: 0.26, petals: 8,
   weight: 0.5, // the motif's stroke, fixed — no longer a control
-  border: true, corners: true,
+  border: true, corners: true, riso: true,
   inset: 0.02, bands: 2, // the frame's own proportions, fixed
   image: null, source: "motif", invert: false, zoom: 1, read: "edges",
   motion: "branch", lag: 0, fps: 8, amount: 0.4, flare: 0.6, steps: 15, transition: "contract", seq: [],
@@ -576,7 +600,7 @@ function draw(frame = null) {
       emerge: !!frame.emerge, relief: S.relief, swell: S.swell,
       latePhase: frame.latePhase ?? null, lateSeed: S.seed,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
-      speckle: S.speckle, speckleSeed: S.seed,
+      speckle: S.riso ? S.speckle : 0, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
     });
   } else {
@@ -589,16 +613,18 @@ function draw(frame = null) {
       // are lit and how strongly — never how big they are
       sizeFrom: grid.cells, fade: frame?.fade || null,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
-      speckle: S.speckle, speckleSeed: S.seed,
+      speckle: S.riso ? S.speckle : 0, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
     });
   }
   compositeStitches(g);
   // the press laid it down unevenly and the paper took it unevenly: both go
   // over the whole panel, ink and ground alike
-  applyRiso(ctx, S.w, S.h, {
-    grain: S.grain, mottle: S.mottle, seed: S.seed, scale: 1 / S.dpr,
-  });
+  if (S.riso) {
+    applyRiso(ctx, S.w, S.h, {
+      grain: S.grain, mottle: S.mottle, seed: S.seed, scale: 1 / S.dpr,
+    });
+  }
 }
 
 // Motion works on the grid, never on the motif: re-running the vector work per
@@ -1109,15 +1135,18 @@ function syncControls() {
   markSwatches();
   sourceRows();
   motionRows();
-  for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
-    ["alphaBtn", "alpha"], ["invert", "invert"]]) $(id).dataset.on = String(S[key]);
+  for (const [id, key] of [["cornersBtn", "corners"], ["invert", "invert"]])
+    $(id).dataset.on = String(S[key]);
+  $("alphaSw").checked = !!S.alpha;
+  $("borderSw").checked = !!S.border;
+  $("risoSw").checked = !!S.riso;
   stage.classList.toggle("alpha", S.alpha);
 }
 
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "lag", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness",
   "medallion", "petals", "cols", "gap", "dither", "threshold",
-  "contrast", "border", "corners", "bg", "ink", "alpha", "w", "h", "soft", "swell", "scatter", "vary", "grain", "mottle", "speckle"];
+  "contrast", "border", "corners", "riso", "bg", "ink", "alpha", "w", "h", "soft", "swell", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -1398,10 +1427,20 @@ $("preset").addEventListener("change", (e) => {
 for (const id of ["pw", "ph"])
   $(id).addEventListener("change", () => setSize(+$("pw").value, +$("ph").value));
 $("shuffle").addEventListener("click", () => setSeed((Math.random() * 1e9) | 0));
-$("alphaBtn").addEventListener("click", (e) => {
-  S.alpha = e.currentTarget.dataset.on !== "true";
-  e.currentTarget.dataset.on = String(S.alpha);
+$("alphaSw").addEventListener("change", (e) => {
+  S.alpha = e.target.checked;
   stage.classList.toggle("alpha", S.alpha);
+  draw();
+  writeHash();
+});
+$("borderSw").addEventListener("change", (e) => {
+  S.border = e.target.checked;
+  build(); // the frame is part of the motif, so the grid is remade
+  writeHash();
+});
+$("risoSw").addEventListener("change", (e) => {
+  // the sliders keep their values; this only decides whether they are applied
+  S.riso = e.target.checked;
   draw();
   writeHash();
 });
@@ -1411,7 +1450,6 @@ const toggle = (id, key) => $(id).addEventListener("click", (e) => {
   build();
   writeHash();
 });
-toggle("borderBtn", "border");
 toggle("cornersBtn", "corners");
 toggle("invert", "invert");
 $("save").addEventListener("click", () =>
@@ -1423,7 +1461,7 @@ $("saveSvg").addEventListener("click", () => {
     contrast: S.contrast, gap: S.gap, dither: S.dither, seed: S.seed,
     swell: S.swell, scatter: S.scatter * (S.w / grid.cols), vary: S.vary,
     printSeed: S.seed, offset: S.offset * (S.w / grid.cols), offsetSeed: 0,
-    speckle: S.speckle, speckleSeed: S.seed,
+    speckle: S.riso ? S.speckle : 0, speckleSeed: S.seed,
     // match what is on screen: the ground unless it is transparent, the
     // relief, and the softness as a blur of the same radius
     bg: S.alpha ? null : S.bg, relief: S.relief, soft: S.soft,
