@@ -709,23 +709,19 @@ export function nudge(x, y, amount, seed) {
   return [x + Math.cos(a) * r, y + Math.sin(a) * r];
 }
 
-export function stitchShape(ctx, x, y, size, shape) {
+// A stitch is a round one. Squares and crosses were the other two and they are
+// gone, along with the branching that chose between them.
+export function stitchShape(ctx, x, y, size) {
   const r = size / 2;
-  if (shape === "dot") {
-    ctx.moveTo(x + size, y + r);
-    ctx.arc(x + r, y + r, r, 0, Math.PI * 2);
-  } else if (shape === "cross") {
-    const t = size * 0.34;
-    ctx.rect(x, y + (size - t) / 2, size, t);
-    ctx.rect(x + (size - t) / 2, y, t, size);
-  } else ctx.rect(x, y, size, size);
+  ctx.moveTo(x + size, y + r);
+  ctx.arc(x + r, y + r, r, 0, Math.PI * 2);
 }
 
 // Paints one level: the lit copy behind, the shaded copy under, the stitch on
 // top. `at` hands back each position so both the still and the moving stitches
 // can use it.
 function paintLevel(ctx, count, at, size, o, alpha) {
-  const { ink, shape, relief = 0, offset = 0, offsetSeed = 0,
+  const { ink, relief = 0, offset = 0, offsetSeed = 0,
     speckle = 0, speckleSeed = 0,
     // both keyed to the print: the lattice is broken once, not per frame
     scatter = 0, vary = 0, printSeed = 0 } = o;
@@ -745,7 +741,7 @@ function paintLevel(ctx, count, at, size, o, alpha) {
         ? base * (1 + (hash01(p[0], p[1], printSeed ^ 0x9e37) * 2 - 1) * vary)
         : base;
       const k = (base - sz) / 2; // grown or shrunk about its own middle
-      stitchShape(ctx, n[0] + dx + k, n[1] + dy + k, sz, shape);
+      stitchShape(ctx, n[0] + dx + k, n[1] + dy + k, sz);
     }
     ctx.fill();
   };
@@ -832,14 +828,14 @@ export function stitchCells(grid, o) {
 const SMOOTH_STEPS = 32;
 
 export function drawStitches(ctx, grid, o) {
-  const { ink = "#2fe36a", shape = "square", relief = 0, swell = 0,
+  const { ink = "#2fe36a", relief = 0, swell = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0,
     scatter = 0, vary = 0, printSeed = 0,
     // fade(cellIndex) -> 0..1, multiplying a stitch's opacity. Nothing else
     // about the stitch changes: same cell, same size, same place.
     fade = null } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
-  const marks = { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
+  const marks = { ink, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
   const place = (cells) => (i) => {
     const lsize = size * (1 - swell * (1 - cells[i][2]));
     const off = (size - lsize) / 2;
@@ -883,7 +879,7 @@ export function drawStitches(ctx, grid, o) {
 // appear, and at phase 1 they sit exactly where the still composition puts them.
 export function drawLoose(ctx, items, o) {
   const {
-    ink = "#2fe36a", shape = "square", size, levels = 3, phase = 1, stagger = 0,
+    ink = "#2fe36a", size, levels = 3, phase = 1, stagger = 0,
     cw = 0, ch = 0, offX = 0, offY = 0, // the cell lattice, to land on
     path = "line",  // "manhattan" turns a corner: across first, then down
     loosen = 0,     // over the last of the run, let them off the lattice again
@@ -934,7 +930,7 @@ export function drawLoose(ctx, items, o) {
   for (let l = 1; l <= levels; l++) {
     const bucket = buckets[l];
     if (!bucket.length) continue;
-    const paintOpts = { ink, shape, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
+    const paintOpts = { ink, relief, offset, offsetSeed, speckle, speckleSeed, scatter, vary, printSeed };
     // Each stitch at the size its own cell asks for — the same rule the still
     // panel uses. Sizing these by their level instead left the two disagreeing,
     // so a gather never quite landed on the picture it came from.
@@ -955,7 +951,7 @@ export function drawLoose(ctx, items, o) {
 // the levels collapse to solid. Set Levels to 1 and the canvas shows exactly
 // what the file will be.
 export function toSVG(grid, o) {
-  const { ink = "#2fe36a", shape = "square", w, h, bg = null, soft = 0, relief = 0, shadow = null,
+  const { ink = "#2fe36a", w, h, bg = null, soft = 0, relief = 0, shadow = null,
     swell = 0, scatter = 0, vary = 0, printSeed = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
@@ -967,16 +963,8 @@ export function toSVG(grid, o) {
   // handful of paths rather than one. Grain and mottle cannot come — they are
   // per-pixel noise, and vector has nowhere to put them.
   const mark = (d, x, y, sz) => {
-    const r = n(sz / 2), s2 = n(sz), X = n(x), Y = n(y);
-    if (shape === "dot") {
-      d.push(`M${X} ${n(y + sz / 2)}a${r} ${r} 0 1 0 ${s2} 0a${r} ${r} 0 1 0 ${n(-sz)} 0z`);
-    } else if (shape === "cross") {
-      const t = n(sz * 0.34), off = n((sz - sz * 0.34) / 2);
-      d.push(`M${X} ${n(y + off)}h${s2}v${t}h${n(-sz)}z`);
-      d.push(`M${n(x + off)} ${Y}h${t}v${s2}h${-t}z`);
-    } else {
-      d.push(`M${X} ${Y}h${s2}v${s2}h${n(-sz)}z`);
-    }
+    const r = n(sz / 2), s2 = n(sz), X = n(x);
+    d.push(`M${X} ${n(y + sz / 2)}a${r} ${r} 0 1 0 ${s2} 0a${r} ${r} 0 1 0 ${n(-sz)} 0z`);
   };
 
   const body = [];

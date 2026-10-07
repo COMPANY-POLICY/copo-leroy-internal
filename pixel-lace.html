@@ -180,11 +180,6 @@
       <input id="soft" type="range" min="0" max="3" step="0.1" value="0.8" /></label>
     <label><span>Dither <b id="v-dither"></b></span>
       <input id="dither" type="range" min="0" max="1" step="0.05" value="0.35" /></label>
-    <label><select id="shape">
-      <option value="square">square stitch</option>
-      <option value="dot">round stitch</option>
-      <option value="cross">cross stitch</option>
-    </select></label>
 
     <h2>Ink</h2>
     <label><span>Threshold <b id="v-threshold"></b></span>
@@ -335,7 +330,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, shape: "square", soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
+  cols: 120, gap: 0.18, levels: 3, dither: 0.35, soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
@@ -502,7 +497,7 @@ function buildSource(over = {}) {
 function drawOpts() {
   return {
     w: S.w, h: S.h, levels: S.levels, threshold: S.threshold, contrast: S.contrast,
-    gap: S.gap, shape: S.shape, dither: S.dither, seed: S.seed,
+    gap: S.gap, dither: S.dither, seed: S.seed,
   };
 }
 
@@ -567,7 +562,7 @@ function draw(frame = null) {
   if (frame?.loose) {
     const cw = S.w / grid.cols, ch = S.h / grid.rows;
     drawLoose(g, frame.loose.items, {
-      ink: S.ink, shape: S.shape, size: frame.loose.size,
+      ink: S.ink, size: frame.loose.size,
       levels: frame.loose.levels, phase: frame.phase,
       cw, ch, offX: (cw - frame.loose.size) / 2, offY: (ch - frame.loose.size) / 2,
       path: S.transition === "corner" ? "manhattan" : "line",
@@ -582,7 +577,7 @@ function draw(frame = null) {
     drawStitches(g, frame?.grid || grid, {
       w: S.w, h: S.h, ink: S.ink, levels: S.levels,
       threshold: frame?.threshold ?? S.threshold,
-      contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither,
+      contrast: S.contrast, gap: S.gap, dither: S.dither,
       seed: frame?.seed ?? S.seed, relief: S.relief, swell: S.swell,
       // sizes come from the still composition, so motion changes which stitches
       // are lit and how strongly — never how big they are
@@ -673,7 +668,7 @@ function loosePair(i) {
 // heart — which is what makes an arm extend along itself.
 let branched = null;
 function branchStitches() {
-  const key = [S.cols, S.levels, S.gap, S.shape, S.threshold, S.contrast, S.dither, S.seed,
+  const key = [S.cols, S.levels, S.gap, S.threshold, S.contrast, S.dither, S.seed,
     S.w, S.h].join("|");
   if (branched && branched.key === key) return branched;
   const { byLevel, size, levels } = stitchCells(grid, drawOpts());
@@ -742,7 +737,7 @@ function branchStitches() {
 // the closer it lies to the heart of the shape, so the pattern assembles from
 // its core outward rather than arriving all at once.
 function looseStitches() {
-  const key = [S.cols, S.levels, S.gap, S.shape, S.threshold, S.contrast, S.dither, S.seed,
+  const key = [S.cols, S.levels, S.gap, S.threshold, S.contrast, S.dither, S.seed,
     S.w, S.h, S.transition].join("|");
   if (loose && loose.key === key) return loose;
   const { byLevel, size, levels } = stitchCells(grid, drawOpts());
@@ -1090,7 +1085,6 @@ function syncControls() {
   $("motion").value = S.motion;
   $("transition").value = S.transition;
   amountLabel();
-  $("shape").value = S.shape;
   markSwatches();
   $("repeatRow").style.display = S.symmetry === "tile" ? "block" : "none";
   for (const [id, key] of [["borderBtn", "border"], ["cornersBtn", "corners"],
@@ -1100,7 +1094,7 @@ function syncControls() {
 
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness", "weight",
-  "medallion", "petals", "cols", "gap", "dither", "shape", "threshold",
+  "medallion", "petals", "cols", "gap", "dither", "threshold",
   "contrast", "border", "corners", "inset", "bands", "bg", "ink", "alpha", "w", "h", "soft", "relief", "swell", "shadow", "offset", "scatter", "vary", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
@@ -1122,7 +1116,6 @@ function readHash() {
   }
   return any;
 }
-$("shape").addEventListener("change", (e) => { S.shape = e.target.value; draw(); writeHash(); });
 $("source").addEventListener("change", (e) => {
   S.source = e.target.value;
   if (S.source !== "motif" && !S.image) $("file").click();
@@ -1392,7 +1385,7 @@ $("saveSvg").addEventListener("click", () => {
   if (!grid) return;
   const svg = toSVG(grid, {
     w: S.w, h: S.h, ink: S.ink, levels: S.levels, threshold: S.threshold,
-    contrast: S.contrast, gap: S.gap, shape: S.shape, dither: S.dither, seed: S.seed,
+    contrast: S.contrast, gap: S.gap, dither: S.dither, seed: S.seed,
     swell: S.swell, scatter: S.scatter * (S.w / grid.cols), vary: S.vary,
     printSeed: S.seed, offset: S.offset * (S.w / grid.cols), offsetSeed: 0,
     speckle: S.speckle, speckleSeed: S.seed,
