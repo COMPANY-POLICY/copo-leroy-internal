@@ -951,7 +951,7 @@ export function drawLoose(ctx, items, o) {
 // the levels collapse to solid. Set Levels to 1 and the canvas shows exactly
 // what the file will be.
 export function toSVG(grid, o) {
-  const { ink = "#2fe36a", w, h, bg = null, soft = 0, relief = 0, shadow = null,
+  const { ink = "#2fe36a", w, h, bg = null, soft = 0, relief = 0,
     swell = 0, scatter = 0, vary = 0, printSeed = 0,
     offset = 0, offsetSeed = 0, speckle = 0, speckleSeed = 0 } = o;
   const { byLevel, size, levels } = stitchCells(grid, o);
@@ -1016,15 +1016,9 @@ export function toSVG(grid, o) {
   const out = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">`,
   ];
-  // canvas blur(Npx) is a gaussian of standard deviation N, same as this, and
-  // the shadow is the same offset, spread and strength the canvas casts
+  // canvas blur(Npx) is a gaussian of standard deviation N, same as this
   const fx = [];
   if (soft > 0) fx.push(`<feGaussianBlur stdDeviation="${n(soft)}"/>`);
-  if (shadow) {
-    fx.push(`<feDropShadow dx="${n(shadow.dx)}" dy="${n(shadow.dy)}" ` +
-      `stdDeviation="${n(soft + shadow.blur)}" flood-color="#000" ` +
-      `flood-opacity="${n(shadow.alpha)}"/>`);
-  }
   if (fx.length) {
     out.push(`<defs><filter id="fx" x="-10%" y="-10%" width="120%" height="120%">` +
       `${fx.join("")}</filter></defs>`);
