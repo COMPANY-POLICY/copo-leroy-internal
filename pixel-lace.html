@@ -70,6 +70,18 @@
       font-size: 0.7rem; font-weight: 400; letter-spacing: .01em; color: var(--ink-muted); }
     h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 
+    /* Look and movement are separate jobs, so they get separate tabs; the
+       output row stays under both. */
+    .tabs { position: sticky; top: -16px; z-index: 1; display: flex; gap: 4px;
+      margin: -16px -16px 16px; padding: 12px 16px 0; background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border); }
+    .tabs button { flex: 1; margin-bottom: -1px; padding: 8px 12px; border: none;
+      border-bottom: 2px solid transparent; border-radius: 0; background: none;
+      color: var(--ink-muted); }
+    .tabs button:hover { background: none; color: var(--ink); }
+    .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--c-olive); }
+    .tabpanel[hidden] { display: none; }
+
     label { display: block; margin-bottom: 10px; }
     label > span { display: flex; justify-content: space-between; align-items: baseline;
       gap: 8px; color: var(--ink-muted); margin-bottom: 4px; }
@@ -137,6 +149,11 @@
 
 <div id="wrap">
   <aside>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="design" aria-selected="true">Design</button>
+      <button role="tab" data-tab="motion" aria-selected="false">Motion</button>
+    </nav>
+    <div class="tabpanel" id="tab-design" role="tabpanel">
     <h2>Panel</h2>
     <label><select id="preset">
       <option value="1080x1350">1080 × 1350 — portrait 4:5</option>
@@ -161,7 +178,7 @@
 
     <h2>Grid</h2>
     <label><span>Columns <b id="v-cols"></b></span>
-      <input id="cols" type="range" min="24" max="400" step="2" value="120" /></label>
+      <input id="cols" type="range" min="24" max="400" step="2" value="220" /></label>
     <label><span>Gap <b id="v-gap"></b></span>
       <input id="gap" type="range" min="0" max="0.6" step="0.02" value="0.18" /></label>
     <label><span>Scatter <b id="v-scatter"></b></span>
@@ -255,7 +272,9 @@
     <label><span>Speckle <b id="v-speckle"></b></span>
       <input id="speckle" type="range" min="0" max="1" step="0.05" value="0.25" /></label>
 
-    <h2>Motion</h2>
+    </div>
+
+    <div class="tabpanel" id="tab-motion" role="tabpanel" hidden>
     <label><select id="motion">
       <option value="none">still</option>
       <option value="branch">branch — grows out from the middle along its arms</option>
@@ -292,6 +311,8 @@
       <button id="record">Record 5s</button>
     </div>
 
+    </div>
+
     <h2>Output</h2>
     <div class="row"><button id="save">Save PNG</button><button id="saveSvg">Save SVG</button></div>
     <div style="color:var(--dim); margin-top:8px" id="info">—</div>
@@ -313,6 +334,16 @@ const { drawLace, drawImageLace, drawBorder, fieldRect, toGrid, drawStitches,
 
 const $ = (id) => document.getElementById(id);
 
+for (const tab of document.querySelectorAll(".tabs [role=tab]")) {
+  tab.addEventListener("click", () => {
+    for (const t of document.querySelectorAll(".tabs [role=tab]")) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", on);
+      $(`tab-${t.dataset.tab}`).hidden = !on;
+    }
+  });
+}
+
 // The working palette, off the studio sheet, with a grey ramp under it. Fixed
 // swatches rather than a colour picker: these are the colours the work is in.
 const PALETTE = ["#fbf4dd", "#fff278", "#86842d", "#403b12", "#2a2a2a", "#181818", "#ffffff"];
@@ -330,7 +361,7 @@ const src = document.createElement("canvas"); // the motif, before the grid
 const S = {
   w: 1400, h: 1000, dpr: 2,
   bg: "#fbf4dd", ink: "#86842d", alpha: false,
-  cols: 120, gap: 0.18, levels: 3, dither: 0.35, soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
+  cols: 220, gap: 0.18, levels: 3, dither: 0.35, soft: 0.8, relief: 0.35, swell: 0.3, shadow: 0, offset: 0, scatter: 0, vary: 0,
   grain: 0.3, mottle: 0.25, speckle: 0.25,
   threshold: 0.2, contrast: 1,
   seed: 20260917, symmetry: "mirror4", repeat: 4,
