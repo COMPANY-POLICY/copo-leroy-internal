@@ -17,6 +17,13 @@ No dependencies, canvas 2D.
 python3 serve.py 5189
 ```
 
+The root opens `pixel-lace.html`, which is the tool. `circle-type.html` sits
+beside it. The particulate cursor it all started from is in `archive/` —
+`cursor.html`, with its frame-stepper. `leroy-cursor.js` stays at the root
+rather than going with it: the lace and the circular type both take their
+seeded random, their value noise and their ink stamps from it, so it is the
+shared engine as much as it is that tool's.
+
 `serve.py` is `http.server` with caching turned off. Left on, a browser holds
 on to modules like `lace.js`, and a reload can leave a fresh page running stale
 code — which looks exactly like a change that did not work.
