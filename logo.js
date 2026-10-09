@@ -92,13 +92,15 @@ function advances(gx, word, fam, fit, wide, track){
   return {adv, total};
 }
 
-// Scales the inked area down (never up) to sit inside the margin, and places it:
-// centred on the height, and across by the alignment.
-function fitInk(gx, W, H, m, align){
-  const d = gx.getImageData(0,0,W,H).data;
-  let x0 = W, y0 = H, x1 = -1, y1 = -1;
-  for(let y=0;y<H;y++){
-    for(let x=0,q=y*W*4;x<W;x++,q+=4){
+// Takes the inked area of `from` (type set somewhere roomy), scales it down
+// (never up) to sit inside the margins of gx, and places it there: centred on
+// the height, across by the alignment, then shifted by (sx, sy).
+function fitInk(from, gx, W, H, mx, my, align, sx = 0, sy = 0){
+  const FW = from.width, FH = from.height;
+  const d = from.getContext('2d').getImageData(0,0,FW,FH).data;
+  let x0 = FW, y0 = FH, x1 = -1, y1 = -1;
+  for(let y=0;y<FH;y++){
+    for(let x=0,q=y*FW*4;x<FW;x++,q+=4){
       if(d[q] >= 128) continue;                   // black type on white
       if(x < x0) x0 = x; if(x > x1) x1 = x;
       if(y < y0) y0 = y; if(y > y1) y1 = y;
@@ -106,12 +108,12 @@ function fitInk(gx, W, H, m, align){
   }
   if(x1 < 0) return;                              // nothing set
   const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-  const k = Math.min(1, (W - 2*m)/bw, (H - 2*m)/bh);
+  const k = Math.min(1, (W - 2*mx)/bw, (H - 2*my)/bh);
   const tw = bw*k, th = bh*k;
-  const tx = align === 'left' ? m : align === 'right' ? W - m - tw : (W - tw)/2;
-  const ty = (H - th)/2;
+  const tx = (align === 'left' ? mx : align === 'right' ? W - mx - tw : (W - tw)/2) + sx;
+  const ty = (H - th)/2 + sy;
   const t = document.createElement('canvas'); t.width = bw; t.height = bh;
-  t.getContext('2d').drawImage(gx.canvas, x0, y0, bw, bh, 0, 0, bw, bh);
+  t.getContext('2d').drawImage(from, x0, y0, bw, bh, 0, 0, bw, bh);
   gx.fillStyle = '#fff'; gx.fillRect(0,0,W,H);
   gx.drawImage(t, tx, ty, tw, th);
   gx.fillStyle = '#000';
@@ -224,27 +226,36 @@ function render(){
   if(!useImg){ gx.fillStyle = '#fff'; gx.fillRect(0,0,W,H); }   // type sets on white
   gx.fillStyle = '#000';
   const band = stack ? H/n : W/n;
+  // Type is set first on a sheet with room all round, so a swash or an italic
+  // overhang that runs past the frame is still there to be measured and
+  // fitted, rather than clipped at the edge before anything looks at it.
+  const PX = Math.round(W*0.5), PY = Math.round(H*0.5);
+  const sheet = document.createElement('canvas');
+  if(!useImg){ sheet.width = W + 2*PX; sheet.height = H + 2*PY; }
+  const tx = sheet.getContext('2d', {willReadFrequently:true});
+  tx.fillStyle = '#fff'; tx.fillRect(0, 0, sheet.width, sheet.height);
+  tx.translate(PX, PY); tx.fillStyle = '#000';
   if(useImg){
     gx.drawImage(IMG, P, P, iw, ih);          // transparent ground: alpha is kept
   } else if(stack){
-    const fit = fitWord(gx, word, FAM, band, FILL);
+    const fit = fitWord(tx, word, FAM, band, FILL);
     const cx = ALIGN === 'center' ? W/2 : ALIGN === 'left' ? 30 : W-30;
     for(let i=0;i<n;i++){
       if(/\s/.test(word[i])) continue;            // blank band for a space
-      drawGlyph(gx, word[i], FAM, fit, cx, band*(i+0.5), WIDE, ALIGN);
+      drawGlyph(tx, word[i], FAM, fit, cx, band*(i+0.5), WIDE, ALIGN);
     }
   } else {
     const M = 40;                                  // side margin
-    let fit = fitWord(gx, word, FAM, H, FILL);
-    let a = advances(gx, word, FAM, fit, WIDE, TRACK);
+    let fit = fitWord(tx, word, FAM, H, FILL);
+    let a = advances(tx, word, FAM, fit, WIDE, TRACK);
     if(a.total > W - 2*M){                         // too wide: scale the word down to fit
       const k = (W - 2*M) / a.total;
-      fit = fitWord(gx, word, FAM, H, FILL*k);
-      a = advances(gx, word, FAM, fit, WIDE, TRACK*k);
+      fit = fitWord(tx, word, FAM, H, FILL*k);
+      a = advances(tx, word, FAM, fit, WIDE, TRACK*k);
     }
     let pen = (W - a.total)/2;                     // centred as a whole
     for(let i=0;i<n;i++){
-      if(!/\s/.test(word[i])) drawGlyphPen(gx, word[i], FAM, fit, pen, H*0.5, WIDE);
+      if(!/\s/.test(word[i])) drawGlyphPen(tx, word[i], FAM, fit, pen, H*0.5, WIDE);
       pen += a.adv[i] + TRACK;
     }
   }
@@ -252,7 +263,16 @@ function render(){
   // swash runs out beyond the first and last letters and was being cut off at
   // the edge. So the word is fitted by where its ink actually is, inside a
   // margin that leaves the spray somewhere to go.
-  if(!useImg) fitInk(gx, W, H, Math.round(Math.min(W, H) * 0.12), stack ? ALIGN : 'center');
+  // How far the spray carries is roughly its distance times how fast the
+  // field runs — swirl one way or another, drift always the same way — so the
+  // margin grows with both, and the word is set back against the drift.
+  if(!useImg){
+    const base = Math.min(W, H) * 0.1;
+    const reachX = SPRAY * (SWIRL*0.5 + Math.abs(DX)) * 0.6;
+    const reachY = SPRAY * (SWIRL*0.5 + Math.abs(DY)) * 0.6;
+    fitInk(sheet, gx, W, H, base + reachX, base + reachY, stack ? ALIGN : 'center',
+      -SPRAY*DX*0.3, -SPRAY*DY*0.3);
+  }
   const src = gx.getImageData(0,0,W,H).data;
   const mask = new Uint8Array(W*H);
   for(let p=0,q=0;p<W*H;p++,q+=4){
@@ -417,7 +437,10 @@ function render(){
     }
   }
 
-  LAST = {W,H,bits,mask,cells,cellN,cellX,cellY,cw,ch:chh,dot:DOT,mode:MODE};
+  // the field and the gradient are kept too: disintegrate blows the dots
+  // along the same currents that made the spray
+  LAST = {W,H,bits,mask,cells,cellN,cellX,cellY,cw,ch:chh,dot:DOT,mode:MODE,
+          flowAt, gradAt, spray:SPRAY};
   paint(ctx, $('alpha').checked);         // the same primitives the SVG will use
   cv.classList.toggle('alpha', $('alpha').checked);
 
@@ -638,9 +661,118 @@ function motionDots(M){
   return MO;
 }
 
+// Disintegrate: the clean wordmark — every cell of the letters a whole dot —
+// breaking down into the distressed one and coming back. Each cell is one of
+// three things. Kept: in the letters and still inked when distressed, it only
+// settles to its distressed place and size. Lost: in the letters but gone in
+// the distressed version, it is blown off along the field and fades. Spray:
+// outside the letters, it is traced back up the field to where it left the
+// letters and streams out from there. The distress runs across in the
+// gradient's direction, from the distressed end.
+let DIS = null;
+function disintegration(M){
+  if(DIS && DIS.last === LAST && DIS.flare === M.flare) return DIS;
+  const {W, H, mask, cw, ch, dot, flowAt, gradAt, spray} = LAST;
+  const g = geometry(), R = g.R;
+  const distressed = new Map();
+  g.dots((x, y, r) => distressed.set(Math.min(ch - 1, (y/dot)|0)*cw + Math.min(cw - 1, (x/dot)|0), [x, y, r]));
+  const inside = (x, y) => {
+    const xi = x|0, yi = y|0;
+    return xi >= 0 && yi >= 0 && xi < W && yi < H && mask[yi*W + xi] === 1;
+  };
+  const v = [0, 0];
+  // a short run along the field, forwards or back, as points to travel through
+  const trail = (x, y, dist, dir, stopInside) => {
+    const pts = [[x, y]], N = 10;
+    for(let k=0;k<N;k++){
+      flowAt(x, y, v);
+      x += v[0]*dir*dist/N; y += v[1]*dir*dist/N;
+      pts.push([x, y]);
+      if(stopInside && inside(x, y)) break;
+    }
+    return pts;
+  };
+  const travel = Math.max(40, spray*0.8) * (0.6 + M.flare);
+  const items = [];
+  for(let cy=0; cy<ch; cy++){
+    for(let cx=0; cx<cw; cx++){
+      const px = cx*dot + dot/2, py = cy*dot + dot/2;
+      // whole in the clean wordmark if most of the cell is letter
+      let hits = 0;
+      for(const [ox, oy] of [[0,0],[-0.3,-0.3],[0.3,-0.3],[-0.3,0.3],[0.3,0.3]]) hits += inside(px + ox*dot, py + oy*dot);
+      const clean = hits >= 3;
+      const d = distressed.get(cy*cw + cx);
+      if(!clean && !d) continue;
+      const i = items.length;
+      if(clean && d){
+        // a kept dot is stirred on the way: it swings out along the current
+        // and comes back to land, so the body of the letters churns too
+        flowAt(px, py, v);
+        const swing = travel*0.22*(0.4 + h01(i, 5));
+        const mx = (px + d[0])/2 + v[0]*swing, my = (py + d[1])/2 + v[1]*swing;
+        items.push({kind:'kept', path:[[px, py], [mx, my], [d[0], d[1]]], r0:R, r1:d[2], a0:1, a1:1});
+      } else if(clean){
+        items.push({kind:'lost', path:trail(px, py, travel*(0.5 + h01(i, 3)), 1, false), r0:R, r1:R*0.35, a0:1, a1:0});
+      } else {
+        const back = trail(d[0], d[1], travel*1.5, -1, true).reverse();
+        items.push({kind:'spray', path:back, r0:d[2]*0.4, r1:d[2], a0:0.15, a1:1});
+      }
+      const [sx, sy] = items[i].path[0];
+      // the distressed end goes first, and the front eats in by patches rather
+      // than as a line — broad noise, with a little grain on top
+      items[i].delay = Math.min(1, (1 - gradAt(sx, sy))*0.6 + vnoise(sx*0.006, sy*0.006)*0.3 + h01(i, 11)*0.1);
+      items[i].i = i;
+    }
+  }
+  DIS = {last: LAST, flare: M.flare, items};
+  return DIS;
+}
+function along(path, e){
+  if(path.length === 2) return [path[0][0] + (path[1][0] - path[0][0])*e, path[0][1] + (path[1][1] - path[0][1])*e];
+  const f = e*(path.length - 1), k = Math.min(path.length - 2, f|0), u = f - k;
+  return [path[k][0] + (path[k+1][0] - path[k][0])*u, path[k][1] + (path[k+1][1] - path[k][1])*u];
+}
+
 // One frame of motion M (the lace's own settings object) onto the preview.
 export function frame(n, M){
   if(!LAST) return;
+  if(M.motion === 'disintegrate'){
+    const {items} = disintegration(M);
+    const fps = Math.max(1, M.fps);
+    const steps = Math.max(2, Math.round(M.steps));
+    const lag = Math.round(M.lag * fps);
+    // whole, breaking down, distressed, coming back: Amount is each hold
+    const hold = Math.max(1, Math.round((0.4 + M.amount*3)*fps));
+    const run = steps + lag, cycle = (hold + run)*2, k = ((n % cycle) + cycle) % cycle;
+    const j = k < hold ? 0 : k < hold + run ? k - hold : k < hold*2 + run ? run : run - (k - hold*2 - run);
+    const at = (x) => Math.max(0, Math.min(steps, x))/steps;
+    const p0 = at(j), p1 = at(j - lag), S = 0.6;
+    // Distressed is never quite still: the spray keeps drifting a little way
+    // back and forth along its current, and every dot boils by a hair from
+    // frame to frame, the way a hand-drawn line does. Clean stays crisp.
+    const t = n/fps, dotSize = LAST.dot;
+    const marks = [];
+    for(const it of items){
+      const raw = Math.max(0, Math.min(1, ((lag > 0 && h01(it.i, 97) < 0.5 ? p1 : p0) - it.delay*S)/(1 - S)));
+      // blown dots are caught by the wind and pick up speed; spray shoots
+      // out and slows as it lands; kept dots ease both ways
+      let e = it.kind === 'lost' ? raw*raw : it.kind === 'spray' ? 1 - (1 - raw)*(1 - raw) : raw*raw*(3 - 2*raw);
+      const a = it.a0 + (it.a1 - it.a0)*e;
+      if(a <= 0.02) continue;
+      let pe = e;
+      if(it.kind === 'spray' && raw >= 1)
+        pe = 1 - 0.12*(0.5 - 0.5*Math.cos(t*(1.2 + h01(it.i, 41)*1.6) + h01(it.i, 43)*6.283));
+      let [x, y] = along(it.path, pe);
+      if(raw > 0){
+        const b = dotSize*0.35*raw;
+        x += (h01(it.i*31 + n, 51) - 0.5)*b;
+        y += (h01(it.i*17 + n, 53) - 0.5)*b;
+      }
+      marks.push([x, y, it.r0 + (it.r1 - it.r0)*e, a]);
+    }
+    drawMarks(marks);
+    return;
+  }
   const {dots} = motionDots(M);
   const fps = Math.max(1, M.fps), amt = M.amount, t = n/fps;
   const steps = Math.max(2, Math.round(M.steps));
@@ -685,7 +817,9 @@ export function frame(n, M){
       marks.push([d.tx, d.ty, d.r, a]);
     }
   } else { still(); return; }
-
+  drawMarks(marks);
+}
+function drawMarks(marks){
   const {W, H} = LAST;
   ctx.clearRect(0, 0, W, H);
   if(!$('alpha').checked){ ctx.fillStyle = bgColour(); ctx.fillRect(0, 0, W, H); }

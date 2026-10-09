@@ -7,6 +7,31 @@
 
 import { rng32, valueNoise } from "./leroy-cursor.js";
 
+// --- growth clock -------------------------------------------------------------
+// The same drawing, painted not in ink but in time: each mark is shaded by the
+// moment a growing plant would lay it down — along a stem from its root to its
+// tip, a leaf from its base once the stem has passed it, the scroll last. The
+// branch motion reads this back to give every stitch its turn, so the panel
+// grows the way the drawing was made rather than by distance from anywhere.
+let CLOCK = false;
+const tcol = (t) => {
+  const v = Math.round(Math.max(0, Math.min(1, t)) * 255);
+  return `rgb(${v},${v},${v})`;
+};
+// sets the paint for the next mark to a time, or a run of time from (x0, y0)
+// to (x1, y1) in the current drawing space
+function when(g, t0, t1 = t0, x0 = 0, y0 = 0, x1 = 1, y1 = 0) {
+  if (!CLOCK) return;
+  let p = tcol(t0);
+  if (t1 !== t0) {
+    p = g.createLinearGradient(x0, y0, x1, y1);
+    p.addColorStop(0, tcol(t0));
+    p.addColorStop(1, tcol(t1));
+  }
+  g.fillStyle = p;
+  g.strokeStyle = p;
+}
+
 // --- motif ------------------------------------------------------------------
 function bez(g, p, steps = 40) {
   const [x0, y0, x1, y1, x2, y2, x3, y3] = p;
@@ -21,18 +46,30 @@ function bez(g, p, steps = 40) {
   return out;
 }
 
-function stroke(g, pts, w) {
+function stroke(g, pts, w, t0, t1) {
   g.lineWidth = w;
+  if (CLOCK && t0 !== undefined) {
+    // on the clock a line is laid down piece by piece, each at its own moment
+    for (let i = 1; i < pts.length; i++) {
+      when(g, t0 + ((t1 - t0) * (i - 1)) / (pts.length - 1));
+      g.beginPath();
+      g.moveTo(pts[i - 1][0], pts[i - 1][1]);
+      g.lineTo(pts[i][0], pts[i][1]);
+      g.stroke();
+    }
+    return;
+  }
   g.beginPath();
   g.moveTo(pts[0][0], pts[0][1]);
   for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
   g.stroke();
 }
 
-function leaf(g, x, y, ang, len, wid) {
+function leaf(g, x, y, ang, len, wid, t0, t1 = t0) {
   g.save();
   g.translate(x, y);
   g.rotate(ang);
+  if (t0 !== undefined) when(g, t0, t1, 0, 0, len, 0); // base first, then the tip
   g.beginPath();
   g.moveTo(0, 0);
   g.quadraticCurveTo(len * 0.45, -wid, len, 0);
@@ -41,7 +78,7 @@ function leaf(g, x, y, ang, len, wid) {
   g.restore();
 }
 
-function scroll(g, x, y, ang, r, turns, w) {
+function scroll(g, x, y, ang, r, turns, w, t0, t1) {
   const pts = [];
   const steps = 48;
   for (let i = 0; i <= steps; i++) {
@@ -50,7 +87,7 @@ function scroll(g, x, y, ang, r, turns, w) {
     const rr = r * (1 - t * 0.92);
     pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]);
   }
-  stroke(g, pts, w);
+  stroke(g, pts, w, t0, t1);
 }
 
 // One sprig of stems, fanned across an angle range and drawn from the centre
@@ -59,6 +96,9 @@ function scroll(g, x, y, ang, r, turns, w) {
 // copies identical.
 function sprig(g, w, h, o, seed, from = 0.12, to = 1.42) {
   const r = rng32(seed);
+  // timing has its own sequence, so the drawing is the same whether or not
+  // the clock is being painted
+  const rt = rng32((seed ^ 0x7a11c0de) >>> 0);
   const { stems, weight, leafiness, spread } = o;
   const diag = Math.hypot(w, h);
   const span = to - from;
@@ -79,7 +119,11 @@ function sprig(g, w, h, o, seed, from = 0.12, to = 1.42) {
       ex - Math.cos(a0 + 0.9) * bow * 0.8, ey - Math.sin(a0 + 0.9) * bow * 0.8,
       ex, ey,
     ]);
-    stroke(g, pts, weight * (1.1 + r() * 0.5));
+    // each stem sets off at its own moment and grows at one pace, so a long
+    // one takes longer to reach its end than a short one
+    const t0 = 0.02 + rt() * 0.16;
+    const D = 0.55 * (len / (diag * 0.9 * reach));
+    stroke(g, pts, weight * (1.1 + r() * 0.5), t0, t0 + D);
 
     // leaves and buds along the stem, alternating sides
     const n = Math.round(3 + leafiness * 6);
@@ -91,8 +135,11 @@ function sprig(g, w, h, o, seed, from = 0.12, to = 1.42) {
       const ang = Math.atan2(qy - py, qx - px);
       const side = i % 2 ? 1 : -1;
       const ll = diag * (0.04 + r() * 0.06) * leafiness * (1 - t * 0.3);
-      leaf(g, px, py, ang + side * (0.7 + r() * 0.5), ll, ll * (0.3 + r() * 0.25));
+      // a leaf opens once the tip has passed where it sits
+      const tl = t0 + t * D + 0.02;
+      leaf(g, px, py, ang + side * (0.7 + r() * 0.5), ll, ll * (0.3 + r() * 0.25), tl, tl + 0.1);
       if (r() < 0.45) {
+        when(g, tl + 0.05);
         const br = diag * (0.012 + r() * 0.016);
         g.beginPath();
         g.arc(px - Math.cos(ang) * br * 2, py - Math.sin(ang) * br * 2, br, 0, Math.PI * 2);
@@ -102,7 +149,7 @@ function sprig(g, w, h, o, seed, from = 0.12, to = 1.42) {
     // a scroll where the stem runs out
     const last = pts[pts.length - 1], prev = pts[pts.length - 6];
     scroll(g, last[0], last[1], Math.atan2(last[1] - prev[1], last[0] - prev[0]),
-      diag * (0.05 + r() * 0.05), 0.8 + r() * 0.5, weight);
+      diag * (0.05 + r() * 0.05), 0.8 + r() * 0.5, weight, t0 + D, t0 + D + 0.12);
   }
 }
 
@@ -111,14 +158,16 @@ function medallion(g, r0, o, seed) {
   const { petals, weight } = o;
   for (let i = 0; i < petals; i++) {
     const a = (i / petals) * Math.PI * 2;
-    leaf(g, Math.cos(a) * r0 * 0.25, Math.sin(a) * r0 * 0.25, a, r0 * 0.8, r0 * 0.3);
+    leaf(g, Math.cos(a) * r0 * 0.25, Math.sin(a) * r0 * 0.25, a, r0 * 0.8, r0 * 0.3, 0.02, 0.12);
   }
   g.lineWidth = weight;
   for (const k of [0.34, 0.5]) {
+    when(g, k * 0.12);
     g.beginPath();
     g.arc(0, 0, r0 * k, 0, Math.PI * 2);
     g.stroke();
   }
+  when(g, 0);
   g.beginPath();
   g.arc(0, 0, r0 * 0.16, 0, Math.PI * 2);
   g.fill();
@@ -128,6 +177,13 @@ function medallion(g, r0, o, seed) {
 function border(g, w, h, o) {
   const { inset, bands, weight, corners } = o;
   g.lineWidth = weight * 1.4;
+  if (CLOCK) { // the frame draws itself round last, from the top both ways
+    const c = g.createConicGradient(-Math.PI / 2, w / 2, h / 2);
+    c.addColorStop(0, tcol(0.72));
+    c.addColorStop(0.5, tcol(1));
+    c.addColorStop(1, tcol(0.72));
+    g.strokeStyle = c;
+  }
   for (let b = 0; b < bands; b++) {
     const d = inset + b * weight * 3.2;
     g.strokeRect(d, d, w - d * 2, h - d * 2);
@@ -139,8 +195,9 @@ function border(g, w, h, o) {
     g.save();
     g.translate(ox, oy);
     g.scale(sx, sy);
-    scroll(g, 0, 0, Math.PI * 0.25, c * 0.5, 1.05, weight);
-    leaf(g, 0, 0, Math.PI * 0.25, c * 0.9, c * 0.3);
+    when(g, 0.82);
+    scroll(g, 0, 0, Math.PI * 0.25, c * 0.5, 1.05, weight, 0.82, 0.95);
+    leaf(g, 0, 0, Math.PI * 0.25, c * 0.9, c * 0.3, 0.82, 0.95);
     g.restore();
   }
 }
@@ -206,6 +263,10 @@ function motif(g, w, h, qo, seed, o) {
 // into the field the border encloses and clipped to it, so it fills that field
 // rather than running under the frame and off the edge of the panel.
 export function drawLace(g, w, h, o) {
+  CLOCK = !!o.clock;
+  try { drawLaceInk(g, w, h, o); } finally { CLOCK = false; }
+}
+function drawLaceInk(g, w, h, o) {
   const seed = o.seed >>> 0;
   g.clearRect(0, 0, w, h);
   g.fillStyle = "#fff";
@@ -889,6 +950,7 @@ export function drawLoose(ctx, items, o) {
     // A second wave: a random share of the stitches runs on its own phase,
     // so they arrive after the rest rather than with them.
     latePhase = null, lateShare = 0.5, lateSeed = 0,
+    smooth = false, // each stitch eases out and in, rather than walking at one pace
   } = o;
   const buckets = Array.from({ length: levels + 1 }, () => []);
   const span = 1 - stagger;
@@ -899,7 +961,8 @@ export function drawLoose(ctx, items, o) {
       (Math.imul(i ^ lateSeed, 2654435761) >>> 0) / 4294967296 < lateShare;
     // linear, and by default everything moves together: the point is that each
     // frame is the whole set a step closer, not a scatter of arrival times
-    const e = Math.max(0, Math.min(1, ((late ? latePhase : phase) - it.delay * stagger) / span));
+    let e = Math.max(0, Math.min(1, ((late ? latePhase : phase) - it.delay * stagger) / span));
+    if (smooth) e = e * e * (3 - 2 * e);
     // A growing stitch is simply there or it is not: no easing in, by size or
     // by opacity. Something dividing appears whole.
     if (emerge && e <= 0) continue;
@@ -911,6 +974,13 @@ export function drawLoose(ctx, items, o) {
     } else {
       x = it.sx + (it.tx - it.sx) * e;
       y = it.sy + (it.ty - it.sy) * e;
+    }
+    // a stitch that carries a bend swings out to one side on the way and back
+    // in to land, so the move reads as a current rather than a slide
+    if (it.ax) {
+      const b = Math.sin(Math.PI * e);
+      x += it.ax * b;
+      y += it.ay * b;
     }
     if (snap) {
       // Every frame is a legal arrangement on the same lattice the stitches
@@ -929,7 +999,10 @@ export function drawLoose(ctx, items, o) {
     }
     it.x = x;
     it.y = y;
-    buckets[it.level].push(it);
+    // one that changes size on the way (a morph between two pictures) is its
+    // old self until halfway and grows or shrinks into its new self
+    if (it.w0 !== undefined) it.wNow = it.w0 + (it.w - it.w0) * e;
+    buckets[it.l0 !== undefined && e < 0.5 ? it.l0 : it.level].push(it);
   }
   // Every stitch is drawn at full strength wherever it is: they are the same
   // stitches throughout, waiting to be arranged, not arriving out of nothing.
@@ -942,7 +1015,7 @@ export function drawLoose(ctx, items, o) {
     // so a gather never quite landed on the picture it came from.
     const at = (i) => {
       const it = bucket[i];
-      const sz = size * (1 - swell * (1 - (it.w ?? 1)));
+      const sz = size * (1 - swell * (1 - (it.wNow ?? it.w ?? 1)));
       const k = (size - sz) / 2;
       return [it.x + k, it.y + k, sz];
     };

@@ -41,6 +41,8 @@
       padding: 14px 32px; border-bottom: 1px solid var(--border);
       background: var(--bg-elevated); }
     .topnav .wordmark { display: block; height: 40px; width: auto; }
+    .topnav__export { margin-left: auto; display: flex; gap: 8px; }
+    .topnav__export[hidden] { display: none; }
     /* What a thing is set to, rather than a button you press: a switch that
        turns a whole section on or off sits on that section's own header. */
     h2 .switch { margin: 0 0 0 auto; }
@@ -177,6 +179,14 @@
 <body>
 <header class="topnav">
   <img class="wordmark" src="logo.png" alt="Archuedy" />
+  <!-- Stills only, of whatever is on the stage: a motion leaves as a
+       recording, from its own tab. -->
+  <div class="topnav__export" id="laceExport">
+    <button id="save">Save PNG</button><button id="saveSvg">Save SVG</button>
+  </div>
+  <div class="topnav__export" id="logoExport" hidden>
+    <button id="lg-dlPng">Save PNG</button><button id="lg-dlSvg">Save SVG</button>
+  </div>
 </header>
 
 <div id="wrap">
@@ -189,14 +199,13 @@
     <div class="tabpanel" id="tab-design" role="tabpanel">
     <h2>Panel</h2>
     <label><select id="preset">
-      <option value="1080x1350">1080 × 1350 — portrait 4:5</option>
-      <option value="1080x1920">1080 × 1920 — story 9:16</option>
-      <option value="1080x1080">1080 × 1080 — square</option>
-      <option value="1200x1500">1200 × 1500 — portrait 4:5 large</option>
-      <option value="1200x630">1200 × 630 — link preview</option>
-      <option value="1920x1080">1920 × 1080 — landscape 16:9</option>
-      <option value="1400x1000">1400 × 1000 — landscape panel</option>
-      <option value="1350x1800">1350 × 1800 — 18 × 24 print</option>
+      <option value="1080x1350">1080 × 1350 portrait 4:5</option>
+      <option value="1080x1920">1080 × 1920 story 9:16</option>
+      <option value="1080x1080">1080 × 1080 square</option>
+      <option value="1200x1500">1200 × 1500 portrait 4:5 large</option>
+      <option value="1920x1080">1920 × 1080 landscape 16:9</option>
+      <option value="1400x1000">1400 × 1000 landscape panel</option>
+      <option value="1350x1800">1350 × 1800 18 × 24 print</option>
       <option value="custom">custom…</option>
     </select></label>
     <div class="mini">
@@ -217,6 +226,8 @@
       <input id="scatter" type="range" min="0" max="1.5" step="0.05" value="0" /></label>
     <label><span>Vary <b id="v-vary"></b></span>
       <input id="vary" type="range" min="0" max="0.9" step="0.05" value="0" /></label>
+    <label><span>Offset <b id="v-offset"></b></span>
+      <input id="offset" type="range" min="0" max="1" step="0.05" value="0" /></label>
     <label><span>Swell <b id="v-swell"></b></span>
       <input id="swell" type="range" min="0" max="0.8" step="0.05" value="0.3" /></label>
     <label><span>Blur <b id="v-soft"></b></span>
@@ -240,27 +251,27 @@
       </div>
     </label>
     <label id="symmetryRow" style="margin-top:8px"><span>Symmetry</span><select id="symmetry">
-      <option value="mirror4">mirrored — both axes</option>
-      <option value="none">none — a single spray</option>
-      <option value="mirrorX">mirrored — one axis</option>
-      <option value="rot4">turned — four-fold</option>
-      <option value="kaleido8">kaleidoscope — eight</option>
+      <option value="mirror4">mirrored both axes</option>
+      <option value="none">none a single spray</option>
+      <option value="mirrorX">mirrored one axis</option>
+      <option value="rot4">turned four-fold</option>
+      <option value="kaleido8">kaleidoscope eight</option>
       <option value="tile">half-drop repeat</option>
     </select></label>
     <label id="repeatRow" hidden><span>Repeat <b id="v-repeat"></b></span>
       <input id="repeat" type="range" min="2" max="10" step="1" value="4" /></label>
     <label style="margin-top:8px"><span>Source</span><select id="source">
       <option value="motif">generated motif</option>
-      <option value="imageLace">image — laced</option>
-      <option value="image">image — flat</option>
+      <option value="imageLace">image laced</option>
+      <option value="image">image flat</option>
     </select></label>
     <div class="row">
       <button id="upload">Upload image…</button>
       <button id="invert" data-on="false" data-for="image">Invert</button>
     </div>
     <label data-for="image" style="margin-top:8px"><span>Read as</span><select id="read">
-      <option value="edges">edges — linework</option>
-      <option value="tone">tone — light and dark</option>
+      <option value="edges">edges linework</option>
+      <option value="tone">tone light and dark</option>
     </select></label>
     <label id="zoomRow"><span>Image zoom <b id="v-zoom"></b></span>
       <input id="zoom" type="range" min="0.4" max="3" step="0.05" value="1" /></label>
@@ -284,8 +295,6 @@
 
     <h2>Border
       <label class="switch"><input type="checkbox" id="borderSw" aria-label="Border" checked /><span class="track"></span></label></h2>
-    <label class="switch"><span>Corners</span>
-      <input type="checkbox" id="cornersSw" checked /><span class="track"></span></label>
 
     <h2>Riso
       <label class="switch"><input type="checkbox" id="risoSw" aria-label="Riso" /><span class="track"></span></label></h2>
@@ -295,10 +304,6 @@
       <input id="mottle" type="range" min="0" max="1" step="0.05" value="0.45" /></label>
     <label><span>Speckle <b id="v-speckle"></b></span>
       <input id="speckle" type="range" min="0" max="1" step="0.05" value="0.05" /></label>
-
-    <!-- stills only: a motion leaves as a recording, from its own tab -->
-    <h2>Output</h2>
-    <div class="row"><button id="save">Save PNG</button><button id="saveSvg">Save SVG</button></div>
     </div>
 
     <div class="tabpanel" id="tab-motion" role="tabpanel" hidden>
@@ -307,19 +312,20 @@
       <button data-target="logo" data-on="false">Logo</button>
     </div>
     <label><select id="motion">
-      <option value="branch">branch — grows out from the middle along its arms</option>
-      <option value="gather">gather — stitches fly in and settle into the shape</option>
-      <option value="weight">weight — the faint parts go first, the dense last</option>
-      <option value="breathe">breathe — opens and closes as one</option>
-      <option value="morph">morph — one image into the next</option>
+      <option value="branch">branch grows out from the middle along its arms</option>
+      <option value="gather">gather stitches fly in and settle into the shape</option>
+      <option value="weight">weight the faint parts go first, the dense last</option>
+      <option value="breathe">breathe opens and closes as one</option>
+      <option value="morph">morph one image into the next</option>
+      <option value="disintegrate">disintegrate the clean wordmark breaks down and comes back</option>
     </select></label>
     <label><select id="transition">
-      <option value="contract">contract — from an even grid, nearest first</option>
-      <option value="corner">corner — across, then down</option>
-      <option value="fall">fall — down the column into place</option>
-      <option value="edges">edges — in from the sides</option>
-      <option value="settle">settle — the shortest move each can make</option>
-      <option value="swap">swap — from anywhere on the grid</option>
+      <option value="contract">contract from an even grid, nearest first</option>
+      <option value="corner">corner across, then down</option>
+      <option value="fall">fall down the column into place</option>
+      <option value="edges">edges in from the sides</option>
+      <option value="settle">settle the shortest move each can make</option>
+      <option value="swap">swap from anywhere on the grid</option>
     </select></label>
     <label id="lagRow"><span>Offset <b id="v-lag"></b></span>
       <input id="lag" type="range" min="0" max="6" step="0.25" value="0" /></label>
@@ -340,7 +346,8 @@
     <div id="seqList"></div>
     <div class="row" style="margin-top:6px">
       <button id="play">Play</button>
-      <button id="record">Record 5s</button>
+      <button class="record" data-secs="5">Record 5s</button>
+      <button class="record" data-secs="10">Record 10s</button>
     </div>
 
     </div>
@@ -350,9 +357,9 @@
     <h2>Look</h2>
     <input type="checkbox" id="lg-alpha" hidden />
     <label><select id="lg-preset">
-      <option value="archadia">archadia — the house look</option>
-      <option value="contour">contour cloud — dots trace the edges</option>
-      <option value="wordmark">wordmark — solid letters and spray</option>
+      <option value="archadia">archadia the house look</option>
+      <option value="contour">contour cloud dots trace the edges</option>
+      <option value="wordmark">wordmark solid letters and spray</option>
       <option value="custom">custom</option>
     </select></label>
     <label><span>Background <b id="lg-vBgC"></b></span><div class="swatches" id="lg-bgSw"></div></label>
@@ -376,7 +383,7 @@
       <option value="dark">dark pixels</option>
       <option value="light">light pixels</option>
       <option value="opaque">opaque areas</option>
-      <option value="hole">transparent areas — knockout art</option>
+      <option value="hole">transparent areas knockout art</option>
     </select></label>
     </div>
 
@@ -396,7 +403,7 @@
     </div>
     <label><span>Layout</span><select id="lg-layout">
       <option value="row">horizontal banner</option>
-      <option value="stack">vertical stack — poster</option>
+      <option value="stack">vertical stack poster</option>
     </select></label>
     <label id="lg-alignRow"><span>Align</span>
       <div class="row" id="lg-alignBtns">
@@ -417,9 +424,9 @@
       </div>
     </label>
     <label><select id="lg-mode">
-      <option value="all">letters and escaping spray — full field</option>
-      <option value="in">inside only — the letters are the particles</option>
-      <option value="out">outside only — shape knocked out</option>
+      <option value="all">letters and escaping spray full field</option>
+      <option value="in">inside only the letters are the particles</option>
+      <option value="out">outside only shape knocked out</option>
       <option value="both">solid shape and spray</option>
     </select></label>
     <label><span>Particles (k) <b id="lg-vN"></b></span>
@@ -458,9 +465,6 @@
       <option value="tb">clean top → distressed bottom</option>
       <option value="bt">clean bottom → distressed top</option>
     </select></label>
-
-    <h2>Output</h2>
-    <div class="row"><button id="lg-dlPng">Save PNG</button><button id="lg-dlSvg">Save SVG</button></div>
     <div id="lg-stat"></div>
     </div>
 
@@ -496,6 +500,8 @@ for (const tab of document.querySelectorAll(".tabs [role=tab]")) {
     // Motion animates whichever piece you came from
     if (tab.dataset.tab !== "motion") setTarget(tab.dataset.tab === "logo" ? "logo" : "lace");
     else showStage();
+    $("laceExport").hidden = tab.dataset.tab !== "design";
+    $("logoExport").hidden = tab.dataset.tab !== "logo";
   });
 }
 for (const b of $("motionTarget").children) b.addEventListener("click", () => setTarget(b.dataset.target));
@@ -556,6 +562,92 @@ let orders = new Map(); // per pair: the order cells change hands in a morph
 let loose = null;       // the stitches as movable things, for the gather
 
 // With no sequence loaded, a morph still has somewhere to go: the next seed.
+// Morph as a move through the form. Each stitch of one picture is matched to a
+// place in the next by where it sits in its own shape — how far from the heart,
+// in which direction — so the heart goes to the heart and an arm to the arm
+// that points the same way. The new picture assembles from its heart outward,
+// each stitch arcing across rather than sliding, and where one picture has
+// more stitches than the other they split from or merge into their partners
+// instead of flying off the frame.
+function formPair(a, b, key) {
+  const kind = S.transition;
+  key = `form:${key}|${kind}|${S.cols}|${S.levels}|${S.gap}|${S.threshold}|${S.contrast}|${S.dither}|${S.seed}|${S.flare}|${S.w}x${S.h}`;
+  if (pairCache.has(key)) return pairCache.get(key);
+  const ink = Math.max(0.06, S.threshold * 0.6);
+  const cw = S.w / a.cols, ch = S.h / a.rows;
+  const place = (g) => {
+    const set = stitchCells(g, drawOpts());
+    const fld = shapeField(g, { ink }).field;
+    const list = [];
+    for (let l = 1; l <= set.levels; l++) for (const p of set.byLevel[l]) {
+      const rx = Math.min(g.cols - 1, Math.max(0, Math.floor(p[0] / cw)));
+      const ry = Math.min(g.rows - 1, Math.max(0, Math.floor(p[1] / ch)));
+      list.push({ x: p[0], y: p[1], l, w: p[2], f: fld[ry * g.cols + rx] });
+    }
+    // depth into the shape by rank, so both pictures run heart to rim evenly
+    const byF = list.map((_, k) => k).sort((p, q) => list[p].f - list[q].f);
+    byF.forEach((k, r) => { list[k].r = r / Math.max(1, list.length - 1); });
+    let cx = 0, cy = 0;
+    for (const s of list) { cx += s.x; cy += s.y; }
+    cx /= list.length || 1; cy /= list.length || 1;
+    // where it sits in its form: a disc with the heart in the middle. Settle
+    // pairs by plain position instead — the shortest move each can make.
+    const SIDE = 256;
+    for (const s of list) {
+      const th = Math.atan2(s.y - cy, s.x - cx);
+      const u = kind === "settle" ? s.x / S.w : 0.5 + 0.5 * s.r * Math.cos(th);
+      const v = kind === "settle" ? s.y / S.h : 0.5 + 0.5 * s.r * Math.sin(th);
+      let x = Math.min(SIDE - 1, Math.floor(u * SIDE)), y = Math.min(SIDE - 1, Math.floor(v * SIDE)), d = 0;
+      for (let q = SIDE / 2; q > 0; q /= 2) {
+        const hx = (x & q) > 0 ? 1 : 0, hy = (y & q) > 0 ? 1 : 0;
+        d += q * q * ((3 * hx) ^ hy);
+        if (hy === 0) { if (hx === 1) { x = q - 1 - x; y = q - 1 - y; } const t = x; x = y; y = t; }
+      }
+      s.h = d;
+    }
+    list.sort((p, q) => p.h - q.h);
+    return { list, size: set.size, levels: set.levels };
+  };
+  const A = place(a), B = place(b);
+  if (kind === "swap") { // no pairing at all, for comparison
+    let z = 0x9e3779b9 ^ S.seed;
+    const rnd = () => (z = (Math.imul(z, 1664525) + 1013904223) >>> 0) / 4294967296;
+    const L = B.list;
+    for (let i = L.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [L[i], L[j]] = [L[j], L[i]]; }
+  }
+  const n = Math.max(A.list.length, B.list.length);
+  const pick = (L, k) => L[Math.min(L.length - 1, Math.floor((k * L.length) / n))];
+  // The transition decides the order things move in and the shape of the move:
+  //   contract  through the form, the new heart first, swinging out on the way
+  //   corner    the same order, across and then down
+  //   fall      bottom row first, each dropping into place, no swing
+  //   edges     in from both sides towards the middle
+  //   settle    nearest to nearest, the least movement there is
+  //   swap      anything to anywhere
+  const bend = (kind === "contract" || kind === "swap" ? 0.32 : kind === "corner" ? 0.12 : 0) * S.flare;
+  const turn = (to, jit) => {
+    if (kind === "fall") return (1 - to.y / S.h) * 0.85 + jit * 0.15;
+    if (kind === "edges") return (1 - Math.abs(to.x - S.w / 2) / (S.w / 2)) * 0.85 + jit * 0.15;
+    if (kind === "settle" || kind === "swap") return jit;
+    return to.r * 0.8 + jit * 0.2;
+  };
+  const items = [];
+  for (let k = 0; k < n; k++) {
+    const from = pick(A.list, k), to = pick(B.list, k);
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const jit = (Math.imul(k + 1, 2654435761) >>> 0) / 4294967296;
+    items.push({
+      sx: from.x, sy: from.y, tx: to.x, ty: to.y, x: from.x, y: from.y,
+      l0: from.l, level: to.l, w0: from.w, w: to.w,
+      ax: -dy * bend, ay: dx * bend,          // always swung the same way round
+      delay: turn(to, jit),
+    });
+  }
+  const out = { items, size: B.size, levels: Math.max(A.levels, B.levels) };
+  pairCache.set(key, out);
+  return out;
+}
+
 function morphTarget() {
   return buildSource({ seed: (S.seed + 1) >>> 0 });
 }
@@ -758,7 +850,7 @@ function draw(frame = null) {
       loosen: frame.emerge ? 1 : 0.3,
       stagger: frame.stagger ?? 0,
       emerge: !!frame.emerge, relief: S.relief, swell: S.swell,
-      latePhase: frame.latePhase ?? null, lateSeed: S.seed,
+      latePhase: frame.latePhase ?? null, lateSeed: S.seed, smooth: !!frame.smooth,
       offset: S.offset * (S.w / grid.cols), offsetSeed: frame?.tick ?? 0,
       speckle: S.riso ? S.speckle : 0, speckleSeed: S.seed,
       scatter: S.scatter * (S.w / grid.cols), vary: S.vary, printSeed: S.seed,
@@ -859,9 +951,42 @@ function loosePair(i) {
 // shape, and it emerges from whichever neighbouring cell lies closer to the
 // heart — which is what makes an arm extend along itself.
 let branched = null;
+// When the drawing reaches each cell: the motif painted again as a growth clock
+// (see lace.js) and read back cell by cell. Only the generated motif has one —
+// a picture has no stems to follow — so for those this is null.
+function growthClock() {
+  if (S.source !== "motif" && S.image) return null;
+  const RES = Math.min(3400, Math.max(1200, S.cols * 10));
+  const c = document.createElement("canvas");
+  c.width = RES;
+  c.height = Math.round((RES * S.h) / S.w);
+  const g = c.getContext("2d", { willReadFrequently: true });
+  drawLace(g, c.width, c.height, { ...S, seed: S.seed, clock: true });
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  const { cols, rows } = grid, W = c.width, H = c.height;
+  const cw = W / cols, ch = H / rows;
+  const stride = Math.max(1, Math.floor(Math.min(cw, ch) / 4));
+  const out = new Float32Array(cols * rows).fill(Infinity);
+  for (let ry = 0; ry < rows; ry++) {
+    for (let rx = 0; rx < cols; rx++) {
+      // the earliest moment anything in the cell is laid down
+      let best = Infinity;
+      for (let y = Math.floor(ry * ch); y < Math.floor((ry + 1) * ch); y += stride) {
+        for (let x = Math.floor(rx * cw); x < Math.floor((rx + 1) * cw); x += stride) {
+          const q = (y * W + x) * 4;
+          if (d[q + 3] > 128) best = Math.min(best, d[q] / 255);
+        }
+      }
+      out[ry * cols + rx] = best;
+    }
+  }
+  return out;
+}
+
 function branchStitches() {
   const key = [S.cols, S.levels, S.gap, S.threshold, S.contrast, S.dither, S.seed,
-    S.w, S.h].join("|");
+    S.w, S.h, S.source, S.symmetry, S.stems, S.spread, S.leafiness, S.weight,
+    S.medallion, S.petals, S.border, S.repeat].join("|");
   if (branched && branched.key === key) return branched;
   const { byLevel, size, levels } = stitchCells(grid, drawOpts());
   const { cols, rows } = grid;
@@ -881,17 +1006,50 @@ function branchStitches() {
   const ink = Math.max(0.06, S.threshold * 0.6);
   const along = shapeField(grid, { ink }).field;
   const spread = growthField(grid, { ink, seed: S.seed, roughness: 1 }).field;
+  // On top of that, each arm keeps its own clock. Which arm a cell belongs to
+  // is read from its bearing out of the middle, and the bearing sets when that
+  // arm sets off and how fast it runs — so the arms leave the heart one after
+  // another and race outward at different speeds, instead of one front
+  // sweeping over all of them at once like a ripple.
   const fld = new Float32Array(along.length);
   {
     const midX = (cols - 1) / 2, midY = (rows - 1) / 2;
     const maxR = Math.hypot(midX, midY) || 1;
+    let z = 0x51ed27 ^ S.seed;
+    const rnd = () => (z = (Math.imul(z, 1664525) + 1013904223) >>> 0) / 4294967296;
+    const p1 = rnd() * 6.283, p2 = rnd() * 6.283, p3 = rnd() * 6.283, p4 = rnd() * 6.283;
     for (let ry = 0; ry < rows; ry++) {
       for (let rx = 0; rx < cols; rx++) {
         const i = ry * cols + rx;
         const radial = Math.hypot(rx - midX, ry - midY) / maxR;
-        fld[i] = radial * 0.5 + along[i] * 0.25 + spread[i] * 0.25;
+        const th = Math.atan2(ry - midY, rx - midX);
+        const start = 0.5 + 0.3 * Math.sin(3 * th + p1) + 0.2 * Math.sin(7 * th + p2);
+        const pace = 0.7 + 0.3 * Math.sin(2 * th + p3) + 0.15 * Math.sin(5 * th + p4);
+        const reach = radial * 0.45 + along[i] * 0.35 + spread[i] * 0.2;
+        fld[i] = start * 0.45 + reach / Math.max(0.35, pace);
       }
     }
+  }
+  // The generated motif knows how it was drawn, so it grows that way: each
+  // stem out from its root at one pace, leaves opening as the tip passes them,
+  // scrolls curling at the ends, the frame last. Cells the clock missed (the
+  // grid's own dither strays) borrow the nearest moment around them.
+  const clock = growthClock();
+  if (clock) {
+    for (let i = 0; i < fld.length; i++) fld[i] = clock[i];
+    for (let pass = 0; pass < 3; pass++) {
+      for (let ry = 0; ry < rows; ry++) for (let rx = 0; rx < cols; rx++) {
+        const i = ry * cols + rx;
+        if (fld[i] !== Infinity) continue;
+        let m = Infinity;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          const nx = rx + ox, ny = ry + oy;
+          if (nx >= 0 && ny >= 0 && nx < cols && ny < rows) m = Math.min(m, fld[ny * cols + nx]);
+        }
+        if (m !== Infinity) fld[i] = m + 0.01;
+      }
+    }
+    for (let i = 0; i < fld.length; i++) if (fld[i] === Infinity) fld[i] = 1;
   }
   const cw = S.w / cols, ch = S.h / rows;
   const items = [];
@@ -901,23 +1059,44 @@ function branchStitches() {
       const rx = Math.min(cols - 1, Math.max(0, Math.floor(tx / cw)));
       const ry = Math.min(rows - 1, Math.max(0, Math.floor(ty / ch)));
       const here = fld[ry * cols + rx];
-      let bx = 0, by = 0, best = here;
-      for (let oy = -1; oy <= 1; oy++) {
-        for (let ox = -1; ox <= 1; ox++) {
-          if (!ox && !oy) continue;
-          const nx = rx + ox, ny = ry + oy;
-          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
-          const v = fld[ny * cols + nx];
-          if (v < best) { best = v; bx = ox; by = oy; }
+      // It shoots out of its own arm: walked back down the arm's clock a few
+      // cells, so it travels the last stretch of the arm to its place and the
+      // tip is seen to extend.
+      let cx = rx, cy = ry;
+      for (let step = 0; step < 3; step++) {
+        let bx = 0, by = 0, best = fld[cy * cols + cx];
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            if (!ox && !oy) continue;
+            const nx = cx + ox, ny = cy + oy;
+            if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+            const v = fld[ny * cols + nx];
+            if (v < best) { best = v; bx = ox; by = oy; }
+          }
         }
+        if (!bx && !by) break;
+        cx += bx; cy += by;
       }
       items.push({
         tx, ty, level: l, w: cell[2],
-        sx: tx + bx * cw * 1.1, sy: ty + by * ch * 1.1,
-        delay: Math.max(0, Math.min(1, here)),
+        w0: Math.min(1.6, (cell[2] ?? 1) + 0.6), // arrives as a bud and settles
+        sx: tx + (cx - rx) * cw, sy: ty + (cy - ry) * ch,
+        delay: here,
         x: tx, y: ty,
       });
     }
+  }
+  if (clock) {
+    // the clock's own pacing is kept — a stem grows at one speed — only
+    // stretched so the last mark lands at the end of the run
+    let lo = Infinity, hi = -Infinity;
+    for (const it of items) { lo = Math.min(lo, it.delay); hi = Math.max(hi, it.delay); }
+    for (const it of items) it.delay = (it.delay - lo) / Math.max(1e-6, hi - lo);
+  } else {
+    // turns by rank, so the growth runs evenly through the whole crossing
+    // rather than bunching where many cells share a clock
+    const byTurn = items.map((_, k) => k).sort((p, q) => items[p].delay - items[q].delay);
+    byTurn.forEach((k, r) => { items[k].delay = r / Math.max(1, items.length - 1); });
   }
   branched = { key, items, size, levels };
   window.__branched = branched;
@@ -1092,8 +1271,14 @@ function motionRows() {
   const morph = $("motion").querySelector('[value="morph"]');
   morph.hidden = morph.disabled = logo;
   if (logo && S.motion === "morph") { S.motion = "branch"; $("motion").value = "branch"; amountLabel(); }
+  // and disintegrate is the logo's own: the lace has no clean version to break from
+  const dis = $("motion").querySelector('[value="disintegrate"]');
+  dis.hidden = dis.disabled = !logo;
+  if (!logo && S.motion === "disintegrate") { S.motion = "branch"; $("motion").value = "branch"; amountLabel(); }
   for (const id of ["flareRow", "morphRow", "seqList"]) $(id).hidden = logo;
-  $("lagRow").hidden = S.motion !== "branch" && S.motion !== "gather";
+  $("lagRow").hidden = !["branch", "gather", "morph", "disintegrate"].includes(S.motion);
+  // Flare sets how far the dots blow on disintegrate, so it shows there too
+  $("flareRow").hidden = logo ? S.motion !== "disintegrate" : false;
 }
 
 function frameFor(n) {
@@ -1138,9 +1323,10 @@ function frameFor(n) {
       const lag = lagFrames();
       const cycle = steps + lag + hold;
       const k = ((n % cycle) + cycle) % cycle;
-      const at = (j) => Math.max(0, Math.min(steps, j)) / steps;
+      // a little quick off the mark, then steady to the tips
+      const at = (j) => 1 - Math.pow(1 - Math.max(0, Math.min(steps, j)) / steps, 1.25);
       return { loose: branchStitches(), phase: at(k), latePhase: lag ? at(k - lag) : null,
-        emerge: true, stagger: 0.85 };
+        emerge: true, stagger: 0.85, smooth: true };
     }
     case "gather": {
       // Counted in frames rather than seconds: one step per frame, so Steps is
@@ -1187,23 +1373,31 @@ function frameFor(n) {
     case "weight": // ordered by how solid each part of the pattern already is
       return waveFrame(t, (cov, tt) => Math.sin(tt * 2 - cov * 7) * amt * 0.3);
     case "morph": {
+      // Each picture holds, then its stitches travel into the next. Steps is
+      // how many frames the crossing takes, Amount how long each one holds,
+      // Offset how far behind the second half of the stitches set out, and
+      // Flare how wide they swing on the way.
+      const steps = Math.max(2, Math.round(S.steps));
+      const lag = lagFrames();
+      const hold = Math.max(1, Math.round((0.4 + amt * 3) * S.fps));
+      const run = steps + lag;
+      const at = (j) => Math.max(0, Math.min(steps, j)) / steps;
+      const move = (j) => ({ phase: at(j), latePhase: lag ? at(j - lag) : null });
+      const look = { stagger: 0.55, smooth: true };
       if (seqGrids.length > 1) {
-        // walk the series: each image holds, then dissolves into the next
-        const per = 0.4 + S.amount * 3; // Amount is the hold, in seconds
-        const span = seqGrids.length * per;
-        const u = ((t % span) + span) % span;
-        const i = Math.floor(u / per);
-        const f = (u % per) / per;
-        const k = Math.max(0, Math.min(1, (f - 0.3) / 0.45)); // hold, then cross
-        const j = (i + 1) % seqGrids.length;
-        return { grid: crossfade(seqGrids[i], seqGrids[j], k, `${i}>${j}`) };
+        // walk the series, each one into the next
+        const leg = hold + run, total = leg * seqGrids.length;
+        const k = ((n % total) + total) % total;
+        const i = Math.floor(k / leg), j = (i + 1) % seqGrids.length;
+        return { loose: formPair(seqGrids[i], seqGrids[j], `${i}>${j}`), ...move(k % leg - hold), ...look };
       }
       if (seqGrids.length === 1) return null; // nothing to cross to yet
       // built on demand, not only when playback starts
       if (!anim.morphB) anim.morphB = morphTarget();
-      const period = Math.max(2, Math.round(S.fps * 2));
-      const p = (n % period) / period;
-      return { grid: morphGrid(p < 0.5 ? p * 2 : 2 - p * 2) };
+      // there and back: the return is the crossing played backwards
+      const cycle = (hold + run) * 2, k = ((n % cycle) + cycle) % cycle;
+      const j = k < hold ? 0 : k < hold + run ? k - hold : k < hold * 2 + run ? run : run - (k - hold * 2 - run);
+      return { loose: formPair(grid, anim.morphB, "seed>next"), ...move(j), ...look };
     }
     default:
       return null;
@@ -1260,7 +1454,7 @@ const SLIDERS = [
   ["cols", "cols", false], ["gap", "gap", true, f2], 
   ["soft", "soft", true, f2], ["swell", "swell", true, f2],
   ["scatter", "scatter", true, f2],
-  ["vary", "vary", true, f2],
+  ["vary", "vary", true, f2], ["offset", "offset", true, f2],
   ["grain", "grain", true, f2], ["mottle", "mottle", true, f2],
   ["speckle", "speckle", true, f2],
   ["dither", "dither", true, f2], ["threshold", "threshold", true, f2],
@@ -1304,7 +1498,6 @@ function syncControls() {
   sourceRows();
   motionRows();
   for (const [id, key] of [["invert", "invert"]]) $(id).dataset.on = String(S[key]);
-  $("cornersSw").checked = !!S.corners;
   $("borderSw").checked = !!S.border;
   $("risoSw").checked = !!S.riso;
   stage.classList.toggle("alpha", S.alpha);
@@ -1313,7 +1506,7 @@ function syncControls() {
 // a seed is only worth having if you can get back to it
 const HASH_KEYS = ["seed", "symmetry", "repeat", "source", "invert", "zoom", "read", "motion", "lag", "fps", "amount", "flare", "steps", "transition", "stems", "spread", "leafiness",
   "medallion", "petals", "cols", "gap", "dither", "threshold",
-  "contrast", "border", "corners", "riso", "bg", "ink", "alpha", "w", "h", "soft", "swell", "scatter", "vary", "grain", "mottle", "speckle"];
+  "contrast", "border", "riso", "bg", "ink", "alpha", "w", "h", "soft", "swell", "scatter", "vary", "offset", "grain", "mottle", "speckle"];
 let hashLock = false;
 function writeHash() {
   if (hashLock) return;
@@ -1356,7 +1549,7 @@ $("source").addEventListener("change", (e) => {
 $("read").addEventListener("change", (e) => { S.read = e.target.value; build(); writeHash(); });
 // Amount means different things per mode, so the label says which
 function amountLabel() {
-  $("amountLabel").innerHTML = S.motion === "morph"
+  $("amountLabel").innerHTML = S.motion === "morph" || S.motion === "disintegrate"
     ? `Hold each <b id="v-amount">${(0.4 + S.amount * 3).toFixed(1)}s</b>`
     : `Amount <b id="v-amount">${S.amount.toFixed(2)}</b>`;
 }
@@ -1364,6 +1557,10 @@ $("amount").addEventListener("input", amountLabel);
 $("transition").addEventListener("change", (e) => {
   S.transition = e.target.value;
   loose = null; // the starting positions are what changes
+  // a morph that is playing goes straight to its crossing, so the new
+  // variant shows at once instead of after the hold
+  if (anim.on && S.motion === "morph" && target === "lace")
+    anim.beat = Math.max(1, Math.round((0.4 + S.amount * 3) * S.fps));
   if (!anim.on && target === "logo") S.motion === "gather" ? logoMod.frame(0, S) : logoMod.still();
   else if (!anim.on) draw(S.motion === "gather" ? frameAt(0) : null);
   writeHash();
@@ -1377,30 +1574,103 @@ $("motion").addEventListener("change", (e) => {
   writeHash();
 });
 $("play").addEventListener("click", () => (anim.on ? stopMotion() : startMotion()));
-$("record").addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
-  if (!anim.on) startMotion();
+// Recording renders the motion frame by frame and encodes each one, rather
+// than filming the canvas as it plays. Filmed live, a large panel drops frames
+// whenever it draws slower than the frame rate, and the browser's own recorder
+// writes a fragmented mp4 that QuickTime and the social apps treat as broken.
+// Here every frame lands on its exact time, and the file is an ordinary mp4.
+let MP4 = null; // the muxer, fetched the first time it is needed
+async function encodeMotion(btn, secs) {
   const logo = target === "logo";
-  const stream = (logo ? logoMod.canvas : stage).captureStream(Math.max(S.fps, 12));
-  // mp4 first — it is what the social apps take without converting
-  const types = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
-  const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t));
-  if (!mimeType) return alert("This browser will not record a canvas.");
-  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 12e6 });
-  const chunks = [];
-  rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
-  rec.onstop = () => {
-    const ext = mimeType.includes("mp4") ? "mp4" : "webm";
-    const url = URL.createObjectURL(new Blob(chunks, { type: mimeType }));
-    download(url, logo ? `${logoMod.recordingName()}.${ext}` : `pixel-lace-${S.w}x${S.h}.${ext}`);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    btn.textContent = "Record 5s";
-    btn.dataset.on = "false";
-  };
-  btn.textContent = "Recording…";
+  const src = logo ? logoMod.canvas : stage;
+  const fps = Math.max(1, Math.round(S.fps));
+  const frames = Math.round(secs * fps);
+  // H.264 tops out around nine megapixels a frame; a big panel on a 2× screen
+  // is far past that, so the video is scaled down to fit — never up.
+  let k = Math.min(1, Math.sqrt(8.8e6 / (src.width * src.height)), 4096 / Math.max(src.width, src.height));
+  const even = (v) => Math.max(2, Math.floor(v / 2) * 2);
+  // Encoded to a fixed quality rather than a bitrate budget. A field of tiny
+  // dots is about the hardest thing there is to compress, and on a budget the
+  // encoder kept it by dropping the small frame-to-frame changes — so the dots
+  // that should drift a little each frame moved in jumps instead. Where the
+  // browser cannot do fixed quality, the budget is set from the frame size.
+  let config = null;
+  for (let tries = 0; tries < 6 && !config; tries++, k *= 0.85) {
+    const base = { codec: "avc1.640034", width: even(src.width * k), height: even(src.height * k), framerate: fps };
+    for (const c of [
+      { ...base, bitrateMode: "quantizer" },
+      { ...base, bitrate: Math.min(120e6, Math.max(20e6, base.width * base.height * fps * 0.6)) },
+    ]) {
+      if (!config && (await VideoEncoder.isConfigSupported(c)).supported) config = c;
+    }
+  }
+  if (!config) throw new Error("this browser cannot encode H.264 at this size");
+  MP4 ??= await import("https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.mjs");
+  const muxer = new MP4.Muxer({
+    target: new MP4.ArrayBufferTarget(),
+    video: { codec: "avc", width: config.width, height: config.height, frameRate: fps },
+    fastStart: "in-memory", // index at the front, so it opens and plays anywhere
+  });
+  let failed = null;
+  const enc = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => { failed = e; },
+  });
+  enc.configure(config);
+  const feed = document.createElement("canvas");
+  feed.width = config.width;
+  feed.height = config.height;
+  const fg = feed.getContext("2d");
+  for (let n = 0; n < frames && !failed; n++) {
+    if (logo) logoMod.frame(n, S);
+    else draw(frameAt(n));
+    fg.drawImage(src, 0, 0, feed.width, feed.height);
+    const vf = new VideoFrame(feed, { timestamp: Math.round((n * 1e6) / fps), duration: Math.round(1e6 / fps) });
+    enc.encode(vf, {
+      // One keyframe, at the start. A keyframe redraws every dot from scratch,
+      // slightly differently from the frames around it, and every two seconds
+      // that showed as the whole field giving a small jolt. A clip this short
+      // does not need more than one.
+      keyFrame: n === 0,
+      // 0 is lossless, 51 the coarsest; at 14 the dots stay crisp frame to frame
+      ...(config.bitrateMode === "quantizer" ? { avc: { quantizer: 14 } } : {}),
+    });
+    vf.close();
+    btn.textContent = `Rendering ${Math.round(((n + 1) / frames) * 100)}%`;
+    // let the encoder catch up, and the button repaint
+    while (enc.encodeQueueSize > 4) await new Promise((r) => setTimeout(r, 0));
+    if (n % 3 === 0) await new Promise((r) => setTimeout(r, 0));
+  }
+  if (failed) throw failed;
+  await enc.flush();
+  enc.close();
+  muxer.finalize();
+  return new Blob([muxer.target.buffer], { type: "video/mp4" });
+}
+
+for (const recBtn of document.querySelectorAll("button.record")) recBtn.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (btn.dataset.on === "true") return; // already rendering
+  const secs = +btn.dataset.secs;
+  const logo = target === "logo";
+  if (logo && !logoMod) return;
+  const wasPlaying = anim.on;
+  stopMotion();
   btn.dataset.on = "true";
-  rec.start();
-  setTimeout(() => rec.stop(), 5000);
+  try {
+    if (!("VideoEncoder" in window)) throw new Error("this browser has no video encoder");
+    const blob = await encodeMotion(btn, secs);
+    const url = URL.createObjectURL(blob);
+    download(url, logo ? `${logoMod.recordingName()}.mp4` : `pixel-lace-${S.w}x${S.h}.mp4`);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (err) {
+    alert(`The recording did not work: ${err.message || err}.`);
+  } finally {
+    btn.textContent = `Record ${secs}s`;
+    btn.dataset.on = "false";
+    if (wasPlaying) startMotion();
+    else stopMotion();
+  }
 });
 $("upload").addEventListener("click", () => $("file").click());
 $("morphImg").addEventListener("click", () => $("fileB").click());
@@ -1610,11 +1880,6 @@ $("shuffle").addEventListener("click", () => setSeed((Math.random() * 1e9) | 0))
 $("borderSw").addEventListener("change", (e) => {
   S.border = e.target.checked;
   build(); // the frame is part of the motif, so the grid is remade
-  writeHash();
-});
-$("cornersSw").addEventListener("change", (e) => {
-  S.corners = e.target.checked;
-  build();
   writeHash();
 });
 $("risoSw").addEventListener("change", (e) => {
