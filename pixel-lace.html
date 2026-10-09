@@ -509,8 +509,27 @@ for (const b of $("motionTarget").children) b.addEventListener("click", () => se
 // The logo is a separate piece of work with its own canvas, so showing it
 // swaps the stage, and puts away what only applies to the lace.
 let target = "lace", logoMod = null;
+// The lace and the logo each keep their own motion settings, so tuning one
+// never disturbs the other. The logo opens on its own default: breaking down
+// and coming back.
+const MOTION_KEYS = ["motion", "transition", "lag", "steps", "flare", "fps", "amount"];
+const motionFor = {
+  lace: null, // whatever the lace had, taken when the logo is first shown
+  logo: { motion: "disintegrate", transition: "corner", lag: 0.25, steps: 15, flare: 0.6, fps: 15, amount: 0.4 },
+};
 async function setTarget(t) {
-  if (t !== target) stopMotion();
+  if (t !== target) {
+    stopMotion();
+    motionFor[target] = Object.fromEntries(MOTION_KEYS.map((k) => [k, S[k]]));
+    target = t; // first, so the controls are checked against the right piece
+    if (motionFor[t]) {
+      Object.assign(S, motionFor[t]);
+      loose = null;
+      hashLock = true; // the link describes the lace, not the logo's motion
+      syncControls();
+      hashLock = false;
+    }
+  }
   target = t;
   for (const b of $("motionTarget").children) b.dataset.on = String(b.dataset.target === t);
   if (t === "logo") {
@@ -1511,7 +1530,9 @@ let hashLock = false;
 function writeHash() {
   if (hashLock) return;
   const q = new URLSearchParams();
-  for (const k of HASH_KEYS) q.set(k, String(S[k]));
+  // while the logo is up, the motion settings in the link stay the lace's
+  const from = (k) => (target === "logo" && motionFor.lace && MOTION_KEYS.includes(k) ? motionFor.lace : S)[k];
+  for (const k of HASH_KEYS) q.set(k, String(from(k)));
   history.replaceState(null, "", "#" + q.toString());
 }
 function readHash() {
